@@ -10,13 +10,18 @@ The engine is a single zero-dependency file that works in Node and the browser. 
 
 ## Results so far
 
-Two 64×64 scenes were authored and verified with this loop (see [docs/FINDINGS.md](docs/FINDINGS.md) for the full experiment log, token economics, and the bugs found):
+Five scenes were authored and verified with this loop (see [docs/FINDINGS.md](docs/FINDINGS.md) for the full experiment log, token economics, and the bugs found):
 
-| House — 18 layers, 23 pixel overrides | Campfire — 15 layers, 23 pixel overrides |
+| House — 64×64, 18 layers | Campfire — 64×64, 15 layers | House 2× — 128×128, 55 layers |
+|---|---|---|
+| ![64x64 pixel-art house](out/house-preview.png) | ![64x64 pixel-art campfire](out/campfire-preview.png) | render via `node cli.js scenes/house128.json --png out/house128.png` |
+
+| Robot — 128×128, 28 layers | Landscape — 256×256, 111 layers |
 |---|---|
-| ![64x64 pixel-art house](out/house-preview.png) | ![64x64 pixel-art campfire](out/campfire-preview.png) |
+| render via `node cli.js scenes/robot.json --png out/robot.png` | render via `node cli.js scenes/landscape256.json --png out/landscape256.png` |
 
-Both were verified pixel-exact in a real browser (geometry, symmetry, outlines, layering, and detail all probed and matched).
+All five were verified pixel-exact in a real browser (canvas-sample SHA-256
+== Node rasterize hash, 0 diffs) and are hash-locked by the test suite.
 
 ## How it works
 
@@ -49,6 +54,39 @@ A scene document is plain JSON:
 
 The agent reasons about ~15–20 objects instead of 4,096 pixels.
 
+## Install
+
+```bash
+npm install pixel-engine-zero
+```
+
+As a library:
+
+```js
+const PE = require('pixel-engine-zero');
+
+const scene = {
+  size: 64,
+  palette: { "sky": "#7EC8E3", "roof": "#C25B3A" },
+  layers: [
+    { "id": "sky", "type": "fill", "color": "sky" },
+    { "id": "roof", "type": "poly", "points": [[13,28],[51,28],[32,11]], "color": "roof" }
+  ],
+  pixels: {}
+};
+
+const rgba = PE.rasterize(scene);      // Uint8Array RGBA buffer
+const png = PE.encode_png(scene);      // Uint8Array PNG bytes
+console.log(PE.read_region(scene));    // ASCII preview
+console.log(PE.inspect(scene));        // color stats + bboxes
+```
+
+As a CLI (or `npx pixel-engine-zero`):
+
+```bash
+pixel-engine scenes/house.json --png out/house.png --html out/house.html
+```
+
 ## Requirements
 
 - Node.js (developed and tested on v24.18.0; only built-in modules are used — no dependencies)
@@ -65,6 +103,9 @@ node cli.js scenes/house.json --zoom 19,28,26,21
 # Browser sandbox (paste JSON → render → click pixels → export PNG)
 node serve.js
 # then open http://localhost:8734
+
+# Run the accuracy suite (75 tests: primitives, edge cases, PNG, hashes, CLI)
+node tests/test-suite.js
 ```
 
 The CLI prints color stats (count + bounding box per color), a full-canvas ASCII preview (auto-scaled to ≤40 chars wide to keep context small), and optionally a full-resolution zoom region or per-color counts for a region.
@@ -104,26 +145,31 @@ node cli.js <scene.json> [--png out.png] [--html out.html]
 ## Project structure
 
 ```
-engine/pixel-engine.js   engine + tools (~600 lines, zero deps)
+engine/pixel-engine.js   engine + tools (~700 lines, zero deps)
+tests/test-suite.js      75-test accuracy suite (node tests/test-suite.js)
 cli.js                   render/inspect/zoom/export driver
 serve.js                 zero-dependency static server for the sandbox
 prototype.html           browser sandbox
-scenes/                  64×64 experiment scenes (house, campfire)
+scenes/                  experiment scenes (64×64 house/campfire, 128×128 house128/robot, 256×256 landscape)
 out/                     generated PNGs, previews, screenshots
 docs/FINDINGS.md         experiment log, failures, research answers
 ```
 
 ## Status and next steps
 
-The 64×64 baseline is validated. Documented next experiments (in `docs/FINDINGS.md`):
+The 64×64 baseline is validated and **hash-locked by a 75-test accuracy
+suite** — any engine change that moves a single pixel fails the run. The
+representation also scales: 128×128 and 256×256 scenes were authored and
+verified pixel-exact (including a 2× upscale of the house). Documented next
+experiments (in `docs/FINDINGS.md`):
 
 1. Stress the repair loop: deliberately flawed scenes, measure render→inspect→fix cycles
-2. Scale to 128×128 and measure token-cost growth
-3. Package the workflow as an installable agent skill (`pixel-art-generation`)
-4. Optionally expose the tool API as MCP tools
+2. Package the workflow as an installable agent skill (`pixel-art-generation`)
+3. Optionally expose the tool API as MCP tools
 
 ## Known limitations
 
-- Experimental prototype: no test suite, no CI, no packaging
-- PNG encoding uses stored DEFLATE blocks (valid, but larger files than compressed encoders)
+- Experimental prototype: no CI, no packaging
+- PNG encoder uses a hand-rolled fixed-Huffman DEFLATE (RFC 1951) — byte-valid
+  (round-trip verified against zlib), but not the most compact compression
 - ASCII inspection is the agent's primary "eyes" — pixel probes and `inspect()` stats are more reliable than eyeballing ASCII rows (see FINDINGS §5)

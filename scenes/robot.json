@@ -1,0 +1,48 @@
+{
+  "size": 128,
+  "palette": {
+    "bg": "#222838",
+    "metal": "#9FB4C7",
+    "metal2": "#6E8498",
+    "metal3": "#C7D6E4",
+    "dark": "#11151C",
+    "visor": "#7EE0FF",
+    "accent": "#FFB300",
+    "core": "#FF5A5A"
+  },
+  "layers": [
+    { "id": "bg", "type": "fill", "color": "bg" },
+    { "id": "antenna", "type": "line", "x1": 64, "y1": 5, "x2": 64, "y2": 9, "color": "metal3" },
+    { "id": "antennaTip", "type": "rect", "x": 63, "y": 3, "w": 3, "h": 2, "color": "accent" },
+    { "id": "head", "type": "rect", "x": 48, "y": 10, "w": 32, "h": 18, "color": "metal" },
+    { "id": "earL", "type": "rect", "x": 44, "y": 14, "w": 4, "h": 8, "color": "metal2" },
+    { "id": "earR", "type": "rect", "x": 80, "y": 14, "w": 4, "h": 8, "color": "metal2" },
+    { "id": "visor", "type": "rect", "x": 52, "y": 14, "w": 24, "h": 4, "color": "visor" },
+    { "id": "visorShine", "type": "rect", "x": 56, "y": 15, "w": 10, "h": 1, "color": "metal3" },
+    { "id": "mouth", "type": "rect", "x": 60, "y": 24, "w": 8, "h": 2, "color": "dark" },
+    { "id": "neck", "type": "rect", "x": 60, "y": 28, "w": 8, "h": 4, "color": "metal2" },
+    { "id": "shoulderL", "type": "rect", "x": 34, "y": 32, "w": 8, "h": 8, "color": "metal2" },
+    { "id": "shoulderR", "type": "rect", "x": 86, "y": 32, "w": 8, "h": 8, "color": "metal2" },
+    { "id": "body", "type": "rect", "x": 40, "y": 32, "w": 48, "h": 60, "color": "metal" },
+    { "id": "chest", "type": "rect", "x": 52, "y": 38, "w": 24, "h": 22, "color": "metal2" },
+    { "id": "coreLight", "type": "rect", "x": 62, "y": 42, "w": 4, "h": 6, "color": "core" },
+    { "id": "ventL", "type": "rect", "x": 54, "y": 52, "w": 6, "h": 2, "color": "dark" },
+    { "id": "ventR", "type": "rect", "x": 68, "y": 52, "w": 6, "h": 2, "color": "dark" },
+    { "id": "armL", "type": "rect", "x": 28, "y": 40, "w": 10, "h": 46, "color": "metal2" },
+    { "id": "armR", "type": "rect", "x": 90, "y": 40, "w": 10, "h": 46, "color": "metal2" },
+    { "id": "handL", "type": "rect", "x": 28, "y": 86, "w": 10, "h": 6, "color": "metal3" },
+    { "id": "handR", "type": "rect", "x": 90, "y": 86, "w": 10, "h": 6, "color": "metal3" },
+    { "id": "belt", "type": "rect", "x": 40, "y": 92, "w": 48, "h": 4, "color": "metal2" },
+    { "id": "legL", "type": "rect", "x": 44, "y": 96, "w": 14, "h": 16, "color": "metal" },
+    { "id": "legR", "type": "rect", "x": 70, "y": 96, "w": 14, "h": 16, "color": "metal" },
+    { "id": "kneeL", "type": "rect", "x": 49, "y": 102, "w": 4, "h": 4, "color": "metal3" },
+    { "id": "kneeR", "type": "rect", "x": 75, "y": 102, "w": 4, "h": 4, "color": "metal3" },
+    { "id": "footL", "type": "rect", "x": 42, "y": 112, "w": 18, "h": 6, "color": "metal2" },
+    { "id": "footR", "type": "rect", "x": 68, "y": 112, "w": 18, "h": 6, "color": "metal2" }
+  ],
+  "pixels": {
+    "49,11": "dark",
+    "64,11": "dark",
+    "78,11": "dark"
+  }
+}

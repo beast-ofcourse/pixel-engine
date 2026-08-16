@@ -1,0 +1,42 @@
+{
+  "name": "pixel-engine-zero",
+  "version": "1.0.0",
+  "description": "Zero-dependency declarative pixel-art engine: JSON scene documents (layers, palette, sparse pixel overrides) rasterized to RGBA and PNG, with inspection tools for LLM-driven construction.",
+  "main": "engine/pixel-engine.js",
+  "bin": {
+    "pixel-engine": "cli.js"
+  },
+  "files": [
+    "engine/",
+    "cli.js",
+    "scenes/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node tests/test-suite.js"
+  },
+  "keywords": [
+    "pixel-art",
+    "pixel-engine",
+    "generative-art",
+    "scene-document",
+    "declarative",
+    "rasterizer",
+    "png",
+    "zero-dependency",
+    "llm"
+  ],
+  "engines": {
+    "node": ">=14"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/beast-ofcourse/pixel-engine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/beast-ofcourse/pixel-engine/issues"
+  },
+  "homepage": "https://github.com/beast-ofcourse/pixel-engine#readme"
+}

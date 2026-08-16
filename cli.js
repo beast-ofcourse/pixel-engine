@@ -49,7 +49,12 @@ function parseRegion(spec, scene) {
 }
 
 const opts = parseArgs(process.argv.slice(2));
-const scene = JSON.parse(fs.readFileSync(opts.sceneFile, 'utf8'));
+let scene;
+try {
+  scene = JSON.parse(fs.readFileSync(opts.sceneFile, 'utf8'));
+} catch (e) {
+  die('cannot read scene file: ' + e.message);
+}
 if (!scene.size) scene.size = 64;
 
 // 1. Summary
@@ -63,6 +68,16 @@ console.log('\n--- color stats (count / bbox) ---');
 for (const c of stats.colors) {
   const name = c.name ? c.name + ' ' : '';
   console.log('  ' + name + c.color + '  ' + c.count + 'px  bbox[' + c.bbox.join(',') + ']');
+}
+
+console.log('\n--- layer bboxes (pre-overwrite, what each layer painted) ---');
+const ids = Object.keys(stats.layerBBoxes);
+if (ids.length) {
+  for (const id of ids) {
+    console.log('  ' + id + '  bbox[' + stats.layerBBoxes[id].join(',') + ']');
+  }
+} else {
+  console.log('  (none)');
 }
 
 // 3. Full-canvas ASCII preview (auto-scaled for context economy)

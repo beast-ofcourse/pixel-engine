@@ -1,6 +1,6 @@
 # AI Pixel Construction — Experiment Findings
 
-Date: 2026-08-16 · Baseline: 64×64 · Engine: zero-dependency (Node + browser)
+Date: 2026-08-16 · Baseline: 64×64, scaled to 128×128 and 256×256 · Engine: zero-dependency (Node + browser)
 
 ---
 
@@ -51,9 +51,9 @@ prototype.html              ← browser sandbox (paste JSON → render → click
 | inspect() | `inspect(scene)` — per-color counts + bounding boxes |
 | export() | `export_png(scene, path)` / `encode_png(scene)` |
 
-The whole engine is **~600 lines, zero dependencies** (PNG encoding uses
-stored DEFLATE blocks + hand-rolled CRC32/ADLER32, so it works identically in
-Node and browser).
+The whole engine is **~700 lines, zero dependencies**. PNG encoding uses a
+hand-rolled fixed-Huffman DEFLATE + greedy LZ77 (RFC 1951 §3.2.6) with a
+zlib wrapper and CRC32/ADLER32, so it works identically in Node and browser.
 
 ---
 
@@ -162,6 +162,51 @@ sparse overrides all behaved exactly as specified on first use.
 
 ---
 
+## 5b. Accuracy hardening — full-pixel equivalence + test suite
+
+After the baseline scenes, the whole pipeline's accuracy was locked down:
+
+1. **Browser == Node, pixel-for-pixel (both scenes, 0/4096 diffs).**
+   A full-canvas diff initially reported 2,080 "differences" tracing the
+   house shape. Investigation showed the *harness* had a sampling bug (canvas
+   row index `y*512` instead of `(y*8)*512`), not the engine — with the index
+   fixed, all 4,096 pixels match for house and campfire, and the in-page
+   engine rasterize SHA-256 equals the Node hash exactly. Lesson: verify the
+   verifier before blaming the engine.
+
+2. **tests/test-suite.js — 75 zero-dependency tests, all green.**
+   Every primitive is locked against hand-computed exact pixel grids (rect,
+   rectout t=1/2, ellipse incl. degenerate rx<1, line incl. steep/reversed,
+   poly incl. even-odd bowtie, polyout), plus edge cases (clipping, OOB,
+   fractional coords, malformed keys, null overrides), inspection tools
+   (read_region scale boundaries 40/80/160, counts mode, legends), PNG
+   structure (signature, IHDR fields, per-chunk CRC, IDAT zlib round-trip
+   byte-exact, determinism, uniform + high-entropy data), CLI behavior
+   (render/png/html/zoom/counts, error exits), and — for every published
+   scene — a locked rasterize hash plus pixel probes.
+
+3. **Scene hashes locked.** house, campfire, house128, robot, and
+   landscape256 rasterize buffers are pinned by SHA-256 in the suite — any
+   engine change that moves a single pixel fails the run. Each scaled scene
+   was also re-verified pixel-exact in a real browser (canvas sample hash ==
+   Node hash).
+
+4. **Engine defects found and fixed by the suite:**
+   - `get_pixel` with out-of-bounds coordinates crashed (negative index →
+     `hexOf([undefined…])` throws). Now returns `null`.
+   - CLI missing-scene-file crashed with an ENOENT stack trace. Now exits 1
+     with `error: cannot read scene file: …`.
+
+5. **Semantics locked by tests (deliberate):** `null` pixel override means
+   "no override — layer beneath shows" (not an alpha-0 hole); `rect`
+   fractional widths use `ceil(x+w)-1`; polygon scanline rule is half-open
+   (top vertex row included); `Math.round` ties round up (degenerate ellipse
+   at cx=3.5 lands on x=4).
+
+Run with `node tests/test-suite.js`.
+
+---
+
 ## 6. Answers to the research questions (64×64 baseline)
 
 **RQ1 — Can a coding LLM construct a recognizable 64×64 image this way?**
@@ -194,8 +239,39 @@ nearly first try) rather than repair. The loop did catch and fix the two real
 bugs — but both were **engine bugs**, not scene bugs. Open question: how
 much repair does a *weak* model need? That's the next experiment (below).
 
-**RQ5–7 — resolution scaling, bottleneck analysis, ceiling without a
-dedicated image model:** not yet tested — next phase (see §7).
+**RQ5 — Does the representation scale to larger canvases?**
+Yes — proven at 128×128 and 256×256. Two scaled scenes were authored and
+verified in this phase:
+
+- `scenes/house128.json` (128×128, 55 layers, 1 pixel override) — a faithful
+  2× upscale of the 64×64 house plus additions (smoke, path, fences, roof
+  tile lines, plank lines, grass, and window crosses promoted from pixel
+  overrides to line layers).
+- `scenes/landscape256.json` (256×256, 111 layers, 13 pixel overrides) — a
+  new multi-element landscape: 3-band sky, sun with 8 rays, 3 clouds, 2
+  birds, 3 mountains with snow caps, pond with shine, 3 trees, a cabin with
+  chimney smoke, path, fences, flowers, and scattered grass.
+- `scenes/robot.json` (128×128, 28 layers, 3 pixel overrides) — a symmetric
+  character (mirrored about x=64).
+
+All three were verified **pixel-exact in a real browser** (canvas sample
+SHA-256 == Node rasterize hash, 0 diffs) and are hash-locked in the suite.
+Cost note: the ASCII preview auto-scales to ≤32×32 chars regardless of
+canvas size, so per-iteration "vision" cost stays ~1–2 KB even at 256×256 —
+but more layers means more edits per fix cycle, and region zooms become the
+workhorse tool at higher resolution.
+
+**RQ6 — Where is the bottleneck as resolution grows?**
+Not the engine (rasterize + PNG are linear and fast at these sizes), and not
+the ASCII preview (auto-scaled). The bottleneck is **scene authoring
+discipline**: more layers to keep consistent, and more places for probe
+coordinates to land on the wrong element. The hash lock + probe tests turn
+"did I change a pixel" into a one-command answer.
+
+**RQ7 — Ceiling without a dedicated image model?**
+Not reached at 256×256. The declarative model keeps working; the practical
+ceiling will come from scene complexity (layers × overlaps), not resolution
+per se. The next deliberate test is a **flawed-scene repair loop** (§7-2).
 
 ---
 
@@ -203,10 +279,12 @@ dedicated image model:** not yet tested — next phase (see §7).
 
 1. **Stress the iteration loop**: deliberately write a flawed scene (bad
    alignment, color collision, broken symmetry) and measure how many
-   render→inspect→fix cycles a model needs to repair it — this is the
-   hypothesis-critical experiment, and it wasn't exercised yet.
-2. **128×128**: same scenes at 2× to measure token cost growth (ASCII
-   previews, zoom discipline) and whether shapes still cohere.
+   render→inspect→fix cycles a model needs to repair it — the
+   hypothesis-critical experiment.
+2. **Probe discipline**: every published scene's probes are locked in the
+   suite; new scenes should lock probes *and* hashes together (several
+   probes in this phase initially landed on the wrong element — the hash
+   lock is the ground truth, probes are documentation of intent).
 3. **Wrap the tools as an installable skill** (`pixel-art-generation`
    SKILL.md) teaching: composition-before-detail, silhouette-first, palette
    discipline, layer-order thinking, inspect-stats-first debugging,
@@ -219,13 +297,20 @@ dedicated image model:** not yet tested — next phase (see §7).
 ## Appendix — artifacts
 
 ```
-engine/pixel-engine.js    engine + tools (~600 lines, zero deps)
+engine/pixel-engine.js    engine + tools (~700 lines, zero deps)
+tests/test-suite.js       75-test accuracy suite (node tests/test-suite.js)
 cli.js                    render/inspect/zoom/export driver
 prototype.html            browser sandbox (JSON → canvas → PNG)
 scenes/house.json         64×64 house (18 layers, 23 overrides)
 scenes/campfire.json      64×64 campfire (15 layers, 23 overrides)
+scenes/house128.json      128×128 house 2× upscale + additions (55 layers, 1 override)
+scenes/robot.json         128×128 robot character (28 layers, 3 overrides)
+scenes/landscape256.json  256×256 landscape (111 layers, 13 overrides)
 out/house.png|.html        exports + previews
 out/campfire.png|.html
+out/house128.png|.html
+out/robot.png|.html
+out/landscape256.png|.html
 out/house-preview.png      browser screenshot (512×512)
 out/campfire-preview.png
 ```

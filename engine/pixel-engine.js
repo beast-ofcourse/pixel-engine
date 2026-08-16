@@ -123,8 +123,10 @@
 
   /** get_pixel(scene, x, y) -> resolved hex color at a coordinate (or null if transparent). */
   function get_pixel(scene, x, y) {
+    const size = scene.size;
+    if (!(x >= 0 && y >= 0 && x < size && y < size)) return null; // out of bounds
     const buf = rasterize(scene);
-    const i = (y * scene.size + x) * 4;
+    const i = (y * size + x) * 4;
     if (buf[i + 3] === 0) return null;
     return hexOf([buf[i], buf[i + 1], buf[i + 2]]);
   }
@@ -133,38 +135,44 @@
   // Rasterizer
   // --------------------------------------------------------------------------
 
-  function setPx(buf, w, x, y, rgb) {
+  function setPx(buf, w, x, y, rgb, track) {
     if (x < 0 || y < 0 || x >= w || y >= buf.length / (4 * w)) return;
     const i = (y * w + x) * 4;
     buf[i] = rgb[0]; buf[i + 1] = rgb[1]; buf[i + 2] = rgb[2]; buf[i + 3] = 255;
+    if (track) {
+      if (x < track.minX) track.minX = x;
+      if (x > track.maxX) track.maxX = x;
+      if (y < track.minY) track.minY = y;
+      if (y > track.maxY) track.maxY = y;
+    }
   }
 
-  function fillRect(buf, w, h, x, y, rw, rh, rgb) {
+  function fillRect(buf, w, h, x, y, rw, rh, rgb, track) {
     const x0 = Math.max(0, Math.floor(x)), y0 = Math.max(0, Math.floor(y));
     const x1 = Math.min(w - 1, Math.ceil(x + rw) - 1), y1 = Math.min(h - 1, Math.ceil(y + rh) - 1);
-    for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) setPx(buf, w, xx, yy, rgb);
+    for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) setPx(buf, w, xx, yy, rgb, track);
   }
 
-  function fillEllipse(buf, w, h, cx, cy, rx, ry, rgb) {
-    if (rx < 1 || ry < 1) { setPx(buf, w, Math.round(cx), Math.round(cy), rgb); return; }
+  function fillEllipse(buf, w, h, cx, cy, rx, ry, rgb, track) {
+    if (rx < 1 || ry < 1) { setPx(buf, w, Math.round(cx), Math.round(cy), rgb, track); return; }
     const x0 = Math.max(0, Math.floor(cx - rx)), x1 = Math.min(w - 1, Math.ceil(cx + rx));
     const y0 = Math.max(0, Math.floor(cy - ry)), y1 = Math.min(h - 1, Math.ceil(cy + ry));
     const rxs = rx * rx, rys = ry * ry;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
-        if ((dx * dx) / rxs + (dy * dy) / rys <= 1) setPx(buf, w, x, y, rgb);
+        if ((dx * dx) / rxs + (dy * dy) / rys <= 1) setPx(buf, w, x, y, rgb, track);
       }
     }
   }
 
-  function drawLine(buf, w, h, x0, y0, x1, y1, rgb) {
+  function drawLine(buf, w, h, x0, y0, x1, y1, rgb, track) {
     x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
     const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     const dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     let err = dx + dy, e2;
     for (;;) {
-      setPx(buf, w, x0, y0, rgb);
+      setPx(buf, w, x0, y0, rgb, track);
       if (x0 === x1 && y0 === y1) break;
       e2 = 2 * err;
       if (e2 >= dy) { err += dy; x0 += sx; }
@@ -172,7 +180,7 @@
     }
   }
 
-  function fillPoly(buf, w, h, pts, rgb) {
+  function fillPoly(buf, w, h, pts, rgb, track) {
     if (!pts || pts.length < 3) return;
     let minY = Infinity, maxY = -Infinity;
     for (const p of pts) {
@@ -197,16 +205,16 @@
       for (let i = 0; i + 1 < xs.length; i += 2) {
         const x0 = Math.max(0, Math.ceil(xs[i]));
         const x1 = Math.min(w - 1, Math.floor(xs[i + 1]));
-        for (let x = x0; x <= x1; x++) setPx(buf, w, x, y, rgb);
+        for (let x = x0; x <= x1; x++) setPx(buf, w, x, y, rgb, track);
       }
     }
   }
 
-  function outlinePoly(buf, w, h, pts, rgb) {
+  function outlinePoly(buf, w, h, pts, rgb, track) {
     if (!pts || pts.length < 2) return;
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i], b = pts[(i + 1) % pts.length];
-      drawLine(buf, w, h, a[0], a[1], b[0], b[1], rgb);
+      drawLine(buf, w, h, a[0], a[1], b[0], b[1], rgb, track);
     }
   }
 
@@ -214,41 +222,47 @@
     const size = scene.size || 64;
     const buf = new Uint8Array(size * size * 4); // transparent by default
     let skipCount = 0;
+    const layerBBoxes = {};
     for (const layer of scene.layers || []) {
       const rgb = resolveColor(scene, layer.color);
       if (!rgb) { skipCount++; continue; }
+      // Bbox of what this layer painted (pre-overwrite), for placement verification.
+      const track = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
       switch (layer.type) {
         case 'fill':
-          fillRect(buf, size, size, 0, 0, size, size, rgb);
+          fillRect(buf, size, size, 0, 0, size, size, rgb, track);
           break;
         case 'rect':
-          fillRect(buf, size, size, layer.x, layer.y, layer.w, layer.h, rgb);
+          fillRect(buf, size, size, layer.x, layer.y, layer.w, layer.h, rgb, track);
           break;
         case 'rectout': {
           const t = layer.t || 1;
           for (let i = 0; i < t; i++) {
             const x = layer.x + i, y = layer.y + i, rw = layer.w - i * 2, rh = layer.h - i * 2;
-            drawLine(buf, size, size, x, y, x + rw - 1, y, rgb);
-            drawLine(buf, size, size, x, y + rh - 1, x + rw - 1, y + rh - 1, rgb);
-            drawLine(buf, size, size, x, y, x, y + rh - 1, rgb);
-            drawLine(buf, size, size, x + rw - 1, y, x + rw - 1, y + rh - 1, rgb);
+            drawLine(buf, size, size, x, y, x + rw - 1, y, rgb, track);
+            drawLine(buf, size, size, x, y + rh - 1, x + rw - 1, y + rh - 1, rgb, track);
+            drawLine(buf, size, size, x, y, x, y + rh - 1, rgb, track);
+            drawLine(buf, size, size, x + rw - 1, y, x + rw - 1, y + rh - 1, rgb, track);
           }
           break;
         }
         case 'ellipse':
-          fillEllipse(buf, size, size, layer.cx, layer.cy, layer.rx, layer.ry, rgb);
+          fillEllipse(buf, size, size, layer.cx, layer.cy, layer.rx, layer.ry, rgb, track);
           break;
         case 'line':
-          drawLine(buf, size, size, layer.x1, layer.y1, layer.x2, layer.y2, rgb);
+          drawLine(buf, size, size, layer.x1, layer.y1, layer.x2, layer.y2, rgb, track);
           break;
         case 'poly':
-          fillPoly(buf, size, size, layer.points, rgb);
+          fillPoly(buf, size, size, layer.points, rgb, track);
           break;
         case 'polyout':
-          outlinePoly(buf, size, size, layer.points, rgb);
+          outlinePoly(buf, size, size, layer.points, rgb, track);
           break;
         default:
           skipCount++;
+      }
+      if (track.minX !== Infinity && layer.id) {
+        layerBBoxes[layer.id] = [track.minX, track.minY, track.maxX - track.minX + 1, track.maxY - track.minY + 1];
       }
     }
     for (const key of Object.keys(scene.pixels || {})) {
@@ -259,6 +273,7 @@
       setPx(buf, size, x, y, rgb);
     }
     scene._skipCount = skipCount;
+    scene._layerBBoxes = layerBBoxes;
     return buf;
   }
 
@@ -307,6 +322,7 @@
       layers: (scene.layers || []).length,
       pixelOverrides: Object.keys(scene.pixels || {}).length,
       skippedLayers: scene._skipCount || 0,
+      layerBBoxes: scene._layerBBoxes || {},
       colors: list.map(function (c) { return { name: nameOf[c.color] || null, color: c.color, count: c.count, bbox: c.bbox }; })
     };
   }
@@ -424,7 +440,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // PNG encoding (stored DEFLATE — zero deps, works in browser and Node)
+  // PNG encoding (fixed-Huffman DEFLATE — zero deps, works in browser and Node)
   // --------------------------------------------------------------------------
 
   let CRC_TABLE = null;
@@ -461,25 +477,85 @@
     return out;
   }
 
-  /**
-   * storedDeflate(raw) — PNG requires a ZLIB-wrapped deflate stream:
-   * CMF/FLG header (2 bytes) + deflate blocks + ADLER32 trailer (4 bytes, BE).
-   * Using stored blocks (BTYPE=00) keeps this dependency-free.
-   */
-  function storedDeflate(raw) {
-    const parts = [];
-    let off = 0;
-    while (off < raw.length) {
-      const len = Math.min(65535, raw.length - off);
-      const final = off + len >= raw.length ? 1 : 0;
-      const hdr = new Uint8Array(5);
-      hdr[0] = final; // BTYPE=00 (stored)
-      hdr[1] = len & 0xFF; hdr[2] = (len >> 8) & 0xFF;
-      hdr[3] = (~len) & 0xFF; hdr[4] = ((~len) >> 8) & 0xFF;
-      parts.push(hdr, raw.subarray(off, off + len));
-      off += len;
+  // Fixed-Huffman DEFLATE (RFC 1951 §3.2.6) + greedy LZ77 matcher.
+  // Zero deps, works in browser and Node. Pixel art has long flat runs, so
+  // this compresses to a fraction of the stored-block size.
+
+  const LENGTH_BASE = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
+  const LENGTH_EXTRA = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
+  const DIST_BASE = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
+  const DIST_EXTRA = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+
+  function deflateFixed(raw) {
+    const n = raw.length;
+    const head = new Int32Array(65536); // 1-entry hash chain over 3-byte sequences
+    head.fill(-1);
+    const out = [];
+    let acc = 0, nbits = 0;
+    function pushBit(bit) {
+      acc |= bit << nbits;
+      if (++nbits === 8) { out.push(acc); acc = 0; nbits = 0; }
     }
-    // ADLER32 of the uncompressed data
+    function writeHuffman(code, bits) {
+      for (let i = bits - 1; i >= 0; i--) pushBit((code >> i) & 1);
+    }
+    function writeExtra(value, bits) {
+      for (let i = 0; i < bits; i++) pushBit((value >> i) & 1);
+    }
+    function fixedLitCode(lit) {
+      if (lit <= 143) return [0x30 + lit, 8];
+      if (lit <= 255) return [0x190 + (lit - 144), 9];
+      if (lit <= 279) return [lit - 256, 7];
+      return [0xC0 + (lit - 280), 8];
+    }
+    function fixedLenCode(code) {
+      if (code <= 279) return [code - 256, 7];
+      return [0xC0 + (code - 280), 8];
+    }
+    // Block header: BFINAL=1, BTYPE=01 (fixed Huffman), bits LSB-first.
+    writeExtra(1, 1);
+    writeExtra(1, 2);
+    const MAX_MATCH = 258, MAX_DIST = 32768;
+    let i = 0;
+    while (i < n) {
+      let bestLen = 0, bestDist = 0;
+      if (i + 2 < n) {
+        const h = ((raw[i] << 8) ^ (raw[i + 1] << 4) ^ raw[i + 2]) & 0xFFFF;
+        const pos = head[h];
+        if (pos !== -1 && i - pos <= MAX_DIST) {
+          let len = 0;
+          while (len < MAX_MATCH && i + len < n && raw[pos + len] === raw[i + len]) len++;
+          if (len >= 3) { bestLen = len; bestDist = i - pos; }
+        }
+        head[h] = i;
+      }
+      if (bestLen >= 3) {
+        let lc = 0;
+        while (lc < LENGTH_BASE.length - 1 && bestLen >= LENGTH_BASE[lc + 1]) lc++;
+        const c = fixedLenCode(257 + lc);
+        writeHuffman(c[0], c[1]);
+        writeExtra(bestLen - LENGTH_BASE[lc], LENGTH_EXTRA[lc]);
+        let dc = 0;
+        while (dc < DIST_BASE.length - 1 && bestDist >= DIST_BASE[dc + 1]) dc++;
+        writeHuffman(dc, 5);
+        writeExtra(bestDist - DIST_BASE[dc], DIST_EXTRA[dc]);
+        i += bestLen;
+      } else {
+        const c = fixedLitCode(raw[i]);
+        writeHuffman(c[0], c[1]);
+        i++;
+      }
+    }
+    writeHuffman(0, 7); // EOB (literal/length code 256)
+    if (nbits > 0) out.push(acc);
+    return new Uint8Array(out);
+  }
+
+  /**
+   * deflateStream(raw) — ZLIB wrapper: CMF/FLG header (2 bytes) + deflate
+   * blocks + ADLER32 trailer (4 bytes, BE).
+   */
+  function deflateStream(raw) {
     let a = 1, b = 0;
     for (let i = 0; i < raw.length; i++) {
       a = (a + raw[i]) % 65521;
@@ -488,7 +564,7 @@
     const adler = new Uint8Array(4);
     new DataView(adler.buffer).setUint32(0, ((b << 16) | a) >>> 0);
     // CMF=0x78 (deflate, 32K window), FLG=0x01 (0x7801 % 31 === 0)
-    return joinBytes([new Uint8Array([0x78, 0x01]), joinBytes(parts), adler]);
+    return joinBytes([new Uint8Array([0x78, 0x01]), deflateFixed(raw), adler]);
   }
 
   /** encode_png(scene) -> Uint8Array of PNG bytes. */
@@ -513,7 +589,7 @@
     return joinBytes([
       new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
       chunk('IHDR', ihdr),
-      chunk('IDAT', storedDeflate(raw)),
+      chunk('IDAT', deflateStream(raw)),
       chunk('IEND', new Uint8Array(0))
     ]);
   }
