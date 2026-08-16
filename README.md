@@ -8,9 +8,41 @@ This is an **experimental research prototype**, not a product. The question it e
 
 The engine is a single zero-dependency file that works in Node and the browser. It rasterizes a declarative scene document to a pixel buffer, renders it to PNG, and exposes inspection tools (ASCII previews, color stats, region zoom) so an agent can render → inspect → fix → re-render without ever reasoning about all 4,096 pixels at once.
 
-## Results so far
+## Showcase
 
-Five scenes were authored and verified with this loop (see [docs/FINDINGS.md](docs/FINDINGS.md) for the full experiment log, token economics, and the bugs found):
+### Benchmark asset set — the best work so far
+
+A coherent 10-asset ladder (16×16 → 64×64) authored with the render → inspect → fix loop, hash-locked by the test suite, and coherence-reviewed so the whole set reads as one artist's style (shared near-black outlines, upper-left lighting, and material palette families). Each asset has an experiment record in `docs/experiments/` (iterations, pixel modifications, palette usage, final assessment).
+
+**Level 1 — basic objects (16×16)**
+
+| Coin | Potion | Sword |
+|---|---|---|
+| ![coin](out/benchmark/coin16.png) | ![potion](out/benchmark/potion16.png) | ![sword](out/benchmark/sword16.png) |
+
+**Level 2 — weapons & tools (32×32)**
+
+| Axe | Chest | Torch |
+|---|---|---|
+| ![axe](out/benchmark/axe32.png) | ![chest](out/benchmark/chest32.png) | ![torch](out/benchmark/torch32.png) |
+
+**Level 2 — weapons & tools (64×64)**
+
+| Sword | Axe |
+|---|---|
+| ![sword](out/benchmark/sword64.png) | ![axe](out/benchmark/axe64.png) |
+
+**Level 5/6 — creature & character (64×64)**
+
+| Dragon | Knight |
+|---|---|
+| ![dragon](out/benchmark/creature64.png) | ![knight](out/benchmark/character64.png) |
+
+All 10 are hash-locked in `tests/test-suite.js` with full SHA-256 digests — any pixel change fails the suite.
+
+### Earlier scenes
+
+The first five scenes authored and verified with this loop (see [docs/FINDINGS.md](docs/FINDINGS.md) for the full experiment log, token economics, and the bugs found):
 
 | House — 64×64, 18 layers | Campfire — 64×64, 15 layers | House 2× — 128×128, 55 layers |
 |---|---|---|
@@ -23,11 +55,13 @@ Five scenes were authored and verified with this loop (see [docs/FINDINGS.md](do
 All five were verified pixel-exact in a real browser (canvas-sample SHA-256
 == Node rasterize hash, 0 diffs) and are hash-locked by the test suite.
 
-**Animation** — the same scene documents become frames. `animations/ball.json`
-is a 16×16, 4-frame bounce (8 fps, frame-0 keyframe) built by duplicating a
-frame and moving the ball layer; consecutive-frame diffs are exactly 30
-pixels. Play it in a browser: `out/ball.html` (play/pause/restart/step,
-fps control, click-to-inspect, spritesheet export).
+### Animation
+
+The same scene documents become frames. `animations/ball.json` is a 16×16,
+4-frame bounce (8 fps, frame-0 keyframe) built by duplicating a frame and
+moving the ball layer; consecutive-frame diffs are exactly 30 pixels. Play it
+in a browser: `out/ball.html` (play/pause/restart/step, fps control,
+click-to-inspect, spritesheet export).
 
 ## How it works
 
@@ -117,7 +151,7 @@ node cli.js scenes/house.json --zoom 19,28,26,21
 node serve.js
 # then open http://localhost:8734
 
-# Run the accuracy suite (104 tests: primitives, edge cases, PNG, hashes, CLI, animation)
+# Run the accuracy suite (127 tests: primitives, edge cases, PNG, hashes, CLI, animation)
 node tests/test-suite.js
 ```
 
@@ -218,29 +252,35 @@ node cli.js anim <anim.json> [--diff a,b] [--validate a,b,x,y,w,h]
 ```text
 engine/pixel-engine.js   engine + tools (~700 lines, zero deps)
 engine/animation.js      animation subsystem: frames, exact diffing, validation, spritesheets
-tests/test-suite.js      104-test accuracy suite (node tests/test-suite.js)
+tests/test-suite.js      127-test accuracy suite (node tests/test-suite.js)
 cli.js                   render/inspect/zoom/export driver + anim subcommand
 serve.js                 zero-dependency static server for the sandbox
 prototype.html           browser sandbox
-scenes/                  experiment scenes (64×64 house/campfire, 128×128 house128/robot, 256×256 landscape)
-animations/ball.json     16×16, 4-frame bounce (8 fps, keyframe-0)
-out/                     generated PNGs, previews, screenshots
+scenes/                  experiment scenes (64×64 house/campfire, 128×128 house128/robot, 256×256 landscape, 10-asset benchmark ladder)
+docs/experiments/        per-asset experiment records for the benchmark ladder
 docs/FINDINGS.md         experiment log, failures, research answers
+skills/                  installable agent skills (pixel-art-generation, pixel-art-animation)
+animations/ball.json     16×16, 4-frame bounce (8 fps, keyframe-0)
+out/                     generated PNGs, previews, screenshots (incl. out/benchmark/)
 ```
 
 ## Status and next steps
 
-The 64×64 baseline is validated and **hash-locked by a 104-test accuracy
+The 64×64 baseline is validated and **hash-locked by a 127-test accuracy
 suite** — any engine change that moves a single pixel fails the run. The
-representation also scales: 128×128 and 256×256 scenes were authored and
-verified pixel-exact (including a 2× upscale of the house), and the animation
-subsystem (milestone 1: 16×16, 2→4 frames, exact diffing, region validation,
-playback preview, spritesheet export) is implemented and hash-locked, with
-the first 2-frame experiment verified in a browser. Documented next
-experiments (in `docs/FINDINGS.md`):
+representation scales: 128×128 and 256×256 scenes were authored and verified
+pixel-exact (including a 2× upscale of the house), the animation subsystem
+(milestone 1: 16×16, 2→4 frames, exact diffing, region validation, playback
+preview, spritesheet export) is implemented and hash-locked, and the
+**10-asset benchmark ladder** (coin, potion, sword, axe, chest, torch, sword,
+axe, dragon, knight — 16×16 → 64×64) is authored, coherence-reviewed, and
+hash-locked. The authoring workflow is packaged as installable agent skills
+(`skills/pixel-art-generation`, `skills/pixel-art-animation`).
 
-1. Stress the repair loop: deliberately flawed scenes, measure render→inspect→fix cycles
-2. Package the workflow as an installable agent skill (`pixel-art-generation`)
+Documented next experiments (in `docs/FINDINGS.md` and `docs/plans/tasks.md`):
+
+1. Animation quality pass (§16): silhouette/palette stability, intentional motion
+2. Stress the repair loop: deliberately flawed scenes, measure render→inspect→fix cycles
 3. Optionally expose the tool API as MCP tools
 4. Animation milestones: 8/12/24-frame scenes, layered motion, walk cycles
 

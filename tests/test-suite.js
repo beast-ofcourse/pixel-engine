@@ -80,8 +80,8 @@ function countPainted(scene) {
 const R = '#ff0000', G = '#00ff00', B = '#0000ff', K = '#000000';
 const CH = {}; CH[R] = 'R'; CH[G] = 'G'; CH[B] = 'B'; CH[K] = 'K';
 
-function hash16(buf) {
-  return crypto.createHash('sha256').update(Buffer.from(buf)).digest('hex').slice(0, 16);
+function hash256(buf) {
+  return crypto.createHash('sha256').update(Buffer.from(buf)).digest('hex');
 }
 
 // --- PNG parsing helpers ----------------------------------------------------
@@ -731,27 +731,78 @@ function loadScene(name) {
 
 test('house: rasterize hash locked (engine == browser verified)', () => {
   const s = loadScene('house');
-  assert.strictEqual(hash16(PE.rasterize(s)), 'e4122858a812f4ad');
+  assert.strictEqual(hash256(PE.rasterize(s)), 'e4122858a812f4ad57417f491d4e4ea92779eb1dbd6cd2501aed3695adeaf54a');
 });
 
 test('campfire: rasterize hash locked', () => {
   const s = loadScene('campfire');
-  assert.strictEqual(hash16(PE.rasterize(s)), 'f2b9806050fbdca3');
+  assert.strictEqual(hash256(PE.rasterize(s)), 'f2b9806050fbdca340cf1980ec10a49ca3c1b1f9d4a7a6e9dcad310dea058e62');
 });
 
 test('house128: rasterize hash locked (engine == browser verified)', () => {
   const s = loadScene('house128');
-  assert.strictEqual(hash16(PE.rasterize(s)), '22f8cbcb86bd47f4');
+  assert.strictEqual(hash256(PE.rasterize(s)), '22f8cbcb86bd47f4f44f7d76d594e120d0cdc8d99672cb61d86be82ceac5fcf1');
 });
 
 test('robot: rasterize hash locked (engine == browser verified)', () => {
   const s = loadScene('robot');
-  assert.strictEqual(hash16(PE.rasterize(s)), '434479ea22214b5b');
+  assert.strictEqual(hash256(PE.rasterize(s)), '434479ea22214b5b6521d04c3a603b8aa56824a1efd4be66855f3e4284bbf468');
 });
 
 test('landscape256: rasterize hash locked (engine == browser verified)', () => {
   const s = loadScene('landscape256');
-  assert.strictEqual(hash16(PE.rasterize(s)), '5192f4c37ca56c03');
+  assert.strictEqual(hash256(PE.rasterize(s)), '5192f4c37ca56c03f1bea198e506d2ffb1ac400f674c4e5511987b7190587ac9');
+});
+
+// benchmark ladder assets (§24 of docs/plans/tasks.md) — hash-locked
+test('coin16: rasterize hash locked', () => {
+  const s = loadScene('coin16');
+  assert.strictEqual(hash256(PE.rasterize(s)), '5d789eb4cafb49effdfcd13691965ee04bf0f2a24523a0d0d7d1de7bcbd98a11');
+});
+
+test('potion16: rasterize hash locked', () => {
+  const s = loadScene('potion16');
+  assert.strictEqual(hash256(PE.rasterize(s)), '20446a07cb427044205097cf7fe71c4c22c9e58ad4b72b73c37c37a3da30d922');
+});
+
+test('sword16: rasterize hash locked', () => {
+  const s = loadScene('sword16');
+  assert.strictEqual(hash256(PE.rasterize(s)), '1e3e27a8094f2a5048ff4a2f1773c686ec23e6d3b35d239dbb149796c09d5eca');
+});
+
+test('axe32: rasterize hash locked', () => {
+  const s = loadScene('axe32');
+  assert.strictEqual(hash256(PE.rasterize(s)), '1c9e9b384dc76510c5db693cd1d208369231631cb430f92012b6dce6d9aa0194');
+});
+
+test('chest32: rasterize hash locked', () => {
+  const s = loadScene('chest32');
+  assert.strictEqual(hash256(PE.rasterize(s)), '939b4d9e37458acd0740d9e60a497dfb5e68237365c2428d891c17e6522ec587');
+});
+
+test('torch32: rasterize hash locked', () => {
+  const s = loadScene('torch32');
+  assert.strictEqual(hash256(PE.rasterize(s)), '88fff1bd3bfc01d05366d8fae2e12740634e62e57479ed755dbc22a3804f21d0');
+});
+
+test('sword64: rasterize hash locked', () => {
+  const s = loadScene('sword64');
+  assert.strictEqual(hash256(PE.rasterize(s)), 'a03ead8e11b582e0a3b8817d3cff993b6bbb545ed95751754fd09be116b3a525');
+});
+
+test('axe64: rasterize hash locked', () => {
+  const s = loadScene('axe64');
+  assert.strictEqual(hash256(PE.rasterize(s)), 'f2e4056dd3204e858e34ca55f46becb0c3b172ebc1b4c4fd7a1982c2c5981e49');
+});
+
+test('character64: rasterize hash locked', () => {
+  const s = loadScene('character64');
+  assert.strictEqual(hash256(PE.rasterize(s)), '24e275aad9bbfaeaa43b6fdd898b8e8145bab1b293cc9104573ffa5d3d138d5e');
+});
+
+test('creature64: rasterize hash locked', () => {
+  const s = loadScene('creature64');
+  assert.strictEqual(hash256(PE.rasterize(s)), '8b7bb303b3c8b02a1dadfb0bb16e5d89c00feaf59319bc0bf06221f9ccb7f30b');
 });
 
 test('house128: known pixel probes (browser-verified)', () => {
@@ -1201,19 +1252,19 @@ test('animation_to_html: transport controls, embedded frames, self-contained', (
 
 test('animation doc: plain JSON survives round-trip with identical pixels', () => {
   const { a } = mkBallAnim();
-  const before = hash16(PA.resolve_frame(a, 'frame-0'));
+  const before = hash256(PA.resolve_frame(a, 'frame-0'));
   const copy = JSON.parse(JSON.stringify(a));
-  assert.strictEqual(hash16(PA.resolve_frame(copy, 'frame-0')), before);
+  assert.strictEqual(hash256(PA.resolve_frame(copy, 'frame-0')), before);
 });
 
 test('ball.json: per-frame rasterize hashes locked (engine == browser verified)', () => {
   const a = loadAnim('ball');
-  const hashes = PA.frame_ids(a).map(function (id) { return hash16(PA.resolve_frame(a, id)); });
+  const hashes = PA.frame_ids(a).map(function (id) { return hash256(PA.resolve_frame(a, id)); });
   assert.deepStrictEqual(hashes, [
-    '43af8a387f40f850',
-    'fa423d3bc10fcce5',
-    '278a8c631c296b31',
-    'fa423d3bc10fcce5' // frame-3 == frame-1 (bounce cycle)
+    '43af8a387f40f8500bd5f9df85b5a6c5cca026d8c162585024bdec55ec8a24b7',
+    'fa423d3bc10fcce5c49a7fe58f7d37f392c193df30cf63d312e3f17fb2d16afa',
+    '278a8c631c296b31e79f97b5845cc3895bcaac326019ada642029fb60b281e18',
+    'fa423d3bc10fcce5c49a7fe58f7d37f392c193df30cf63d312e3f17fb2d16afa' // frame-3 == frame-1 (bounce cycle)
   ]);
 });
 
@@ -1245,7 +1296,7 @@ test('ball.json: spritesheet locked (64x16, hash)', () => {
   assert.strictEqual(sheet.readUInt32BE(16), 64);
   assert.strictEqual(sheet.readUInt32BE(20), 16);
   assert.strictEqual(sheet.length, 328);
-  assert.strictEqual(hash16(sheet), 'a96900730929059c');
+  assert.strictEqual(hash256(sheet), 'a96900730929059c5285b9960aeb7f4a62c9b83c4f8a99cef661756f3aa0dfa5');
 });
 
 test('ball.json: palette drift empty, keyframes locked, frame-3 mirrors frame-1', () => {
@@ -1254,8 +1305,8 @@ test('ball.json: palette drift empty, keyframes locked, frame-3 mirrors frame-1'
   assert.deepStrictEqual(a.keyframes, { 'frame-0': true });
   assert.strictEqual(a.fps, 8);
   assert.deepStrictEqual(
-    hash16(PA.resolve_frame(a, 'frame-3')),
-    hash16(PA.resolve_frame(a, 'frame-1'))
+    hash256(PA.resolve_frame(a, 'frame-3')),
+    hash256(PA.resolve_frame(a, 'frame-1'))
   );
 });
 

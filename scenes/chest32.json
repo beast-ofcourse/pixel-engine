@@ -1,0 +1,36 @@
+{
+  "size": 32,
+  "palette": {
+    "outline": "#1a1a1a",
+    "woodDark": "#4a2c10",
+    "woodMid": "#6e4218",
+    "woodLight": "#96602a",
+    "woodHighlight": "#b87a3a",
+    "metalMid": "#8a8a8a",
+    "metalLight": "#c8c8c8",
+    "goldDark": "#7a5a14",
+    "goldMid": "#b8860b",
+    "goldLight": "#d4a017"
+  },
+  "layers": [
+    { "id": "bodyOutline", "type": "rect", "x": 6, "y": 10, "w": 20, "h": 15, "color": "outline" },
+    { "id": "bodyWood", "type": "rect", "x": 7, "y": 10, "w": 18, "h": 14, "color": "woodMid" },
+    { "id": "bodyTopLight", "type": "rect", "x": 7, "y": 10, "w": 18, "h": 2, "color": "woodLight" },
+    { "id": "leftBand", "type": "rect", "x": 9, "y": 10, "w": 2, "h": 15, "color": "metalMid" },
+    { "id": "rightBand", "type": "rect", "x": 21, "y": 10, "w": 2, "h": 15, "color": "metalMid" },
+    { "id": "lidOutline", "type": "poly", "points": [[6,10],[8,5],[13,4],[19,4],[24,5],[25,10]], "color": "outline" },
+    { "id": "lidWood", "type": "poly", "points": [[7,9],[9,6],[13,5],[19,5],[23,6],[24,9]], "color": "woodMid" },
+    { "id": "lidLight", "type": "rect", "x": 10, "y": 5, "w": 12, "h": 1, "color": "woodLight" },
+    { "id": "lockOutline", "type": "rectout", "x": 14, "y": 14, "w": 4, "h": 6, "t": 1, "color": "goldDark" },
+    { "id": "lockMid", "type": "rect", "x": 15, "y": 14, "w": 2, "h": 6, "color": "goldMid" },
+    { "id": "footLeft", "type": "rect", "x": 8, "y": 25, "w": 4, "h": 2, "color": "woodDark" },
+    { "id": "footRight", "type": "rect", "x": 20, "y": 25, "w": 4, "h": 2, "color": "woodDark" }
+  ],
+  "pixels": {
+    "15,16": "outline", "16,16": "outline", "16,17": "outline",
+    "15,14": "goldLight", "16,14": "goldLight",
+    "9,10": "metalLight", "9,11": "metalLight", "21,10": "metalLight", "21,11": "metalLight",
+    "9,5": "woodHighlight",
+    "12,16": "woodDark", "13,16": "woodDark", "18,20": "woodDark", "19,20": "woodDark"
+  }
+}

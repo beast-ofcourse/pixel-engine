@@ -1,0 +1,31 @@
+{
+  "size": 16,
+  "palette": {
+    "outline": "#1a1a1a",
+    "bladeMid": "#7a8a9a",
+    "bladeLight": "#b8c8d8",
+    "bladeHighlight": "#e8f4ff",
+    "guardDark": "#6a4a14",
+    "guardMid": "#b8860b",
+    "guardLight": "#d4a017",
+    "gripDark": "#3a2010",
+    "gripMid": "#6a3e1a",
+    "pommelDark": "#4a2c10",
+    "pommelMid": "#8a5a28"
+  },
+  "layers": [
+    { "id": "bladeOutline", "type": "poly", "points": [[8,1],[9,9],[7,9]], "color": "outline" },
+    { "id": "bladeLight", "type": "rect", "x": 7, "y": 2, "w": 1, "h": 7, "color": "bladeLight" },
+    { "id": "bladeMid", "type": "rect", "x": 8, "y": 2, "w": 1, "h": 7, "color": "bladeMid" },
+    { "id": "guardOutline", "type": "rectout", "x": 4, "y": 9, "w": 9, "h": 2, "t": 1, "color": "guardDark" },
+    { "id": "guardMid", "type": "rect", "x": 5, "y": 9, "w": 7, "h": 2, "color": "guardMid" },
+    { "id": "grip", "type": "rect", "x": 7, "y": 11, "w": 2, "h": 3, "color": "gripMid" },
+    { "id": "gripDark", "type": "rect", "x": 7, "y": 11, "w": 2, "h": 1, "color": "gripDark" },
+    { "id": "pommel", "type": "rect", "x": 7, "y": 13, "w": 2, "h": 2, "color": "pommelMid" },
+    { "id": "pommelDark", "type": "rect", "x": 7, "y": 13, "w": 2, "h": 1, "color": "pommelDark" }
+  ],
+  "pixels": {
+    "7,2": "bladeHighlight", "7,3": "bladeHighlight", "7,4": "bladeHighlight",
+    "5,9": "guardLight", "6,9": "guardLight"
+  }
+}

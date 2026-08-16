@@ -1,0 +1,24 @@
+{
+  "size": 16,
+  "palette": {
+    "outline": "#2b1d0e",
+    "rimDark": "#7a5c1e",
+    "rimMid": "#b8860b",
+    "faceMid": "#e0b52e",
+    "faceLight": "#f2d06a",
+    "accent": "#fff3c4",
+    "emblem": "#6b4a12"
+  },
+  "layers": [
+    { "id": "silhouette", "type": "ellipse", "cx": 8, "cy": 8, "rx": 6.5, "ry": 6.5, "color": "outline" },
+    { "id": "rim", "type": "ellipse", "cx": 8, "cy": 8, "rx": 5.5, "ry": 5.5, "color": "rimMid" },
+    { "id": "face", "type": "ellipse", "cx": 8, "cy": 8, "rx": 4.5, "ry": 4.5, "color": "faceMid" },
+    { "id": "faceRaised", "type": "ellipse", "cx": 8, "cy": 8, "rx": 3.5, "ry": 3.5, "color": "faceLight" }
+  ],
+  "pixels": {
+    "8,7": "emblem", "7,8": "emblem", "9,8": "emblem", "8,9": "emblem",
+    "8,8": "accent",
+    "4,4": "accent", "5,3": "accent", "6,3": "accent", "3,5": "accent",
+    "11,13": "rimDark", "12,12": "rimDark", "13,11": "rimDark"
+  }
+}
