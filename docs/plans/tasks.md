@@ -709,7 +709,7 @@ Evaluate multiple dimensions.
 
 Evaluate the sprite at multiple scales.
 
-### Native resolution
+## Native resolution
 
 This is the most important.
 
@@ -717,7 +717,7 @@ Ask:
 
 > Does it actually read as pixel art at its intended resolution?
 
-### Enlarged nearest-neighbor view
+## Enlarged nearest-neighbor view
 
 Use 4×, 8×, or similar integer scaling.
 
@@ -728,13 +728,13 @@ This exposes:
 - bad diagonals
 - inconsistent outlines
 
-### Silhouette-only view
+## Silhouette-only view
 
 Hide internal colors.
 
 This tests structural quality.
 
-### Palette/value view
+## Palette/value view
 
 Inspect whether the color hierarchy makes sense.
 
@@ -1370,7 +1370,7 @@ record, and no agent touches shared files (engine, tests, cli, tasks.md).
 
 | Criterion | Verdict | Evidence |
 |---|---|---|
-| Palette compatibility | PASS | Same material families across the set: steel `#7a8a9a`/`#b8c8d8` (sword16, axe32, sword64, axe64, character64), wood `#6b4226`-family (axe32, chest32, torch32, axe64), gold `#e8c14e`-family (coin16, sword64), armor/leather tones (character64), 2–3 tone dark/mid/light shading per material |
+| Palette compatibility | PASS | Same material families across the set: steel family (sword16, axe32, sword64, axe64, character64), wood family (axe32, chest32, torch32, axe64), gold family (coin16, sword64), armor/leather tones (character64), 2–3 tone dark/mid/light shading per material. Hex values listed here are representative material-family examples — exact per-scene values live in each scene's palette |
 | Outline compatibility | PASS (note) | 8/10 share `#1a1a1a`; coin16 `#2b1d0e` and potion16 `#1c2026` are hue-tinted near-blacks (warm for gold, cool for glass) — deliberate, harmonize with subject, all within the near-black family |
 | Lighting compatibility | PASS | Upper-left lighting everywhere: light on top/left edges, shadow on bottom/right (documented per asset in `docs/experiments/*.md`) |
 | Pixel density | PASS | Density scales with canvas: sparse 16×16, medium 32×32, detailed 64×64; same subjects at two scales (sword16→sword64, axe32→axe64) keep silhouette + material treatment |

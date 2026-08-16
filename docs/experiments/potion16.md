@@ -4,7 +4,7 @@
 |---|---|
 | Asset | 16×16 potion (glass bottle, cork, red liquid) |
 | Model | orchestrator (direct) |
-| Iterations | 2 |
+| Iterations | 3 |
 | Total pixel modifications | 7 (glint + right-edge shadow overrides) |
 | Final unexpected mutations | 0 |
 | Palette size | 8 (outline, glassDark, glassMid, liquidMid, liquidLight, corkDark, corkMid, glint) |
@@ -22,10 +22,13 @@
 
 3. **Cleanup** — removed unused `liquidDark` palette key (8 colors final).
 
+4. **Margin fix (review)** — CodeRabbit flagged the cork starting at y=0 (no top margin). Cork y 0→1, h 3→2; corkTop y 0→1; bodyOutline ry 5.0→4.5 so the bottle fits with margins on both axes.
+   - Verify: artwork spans y=1..13 — margins 1 top / 2 bottom / 2 left / 2 right, all within the 1–2px rule. Bottle silhouette and shading read unchanged.
+
 ## Final inspect() summary
 
-- outline 41px bbox[2,3,12,12] (cork+neck+body silhouette)
-- liquidLight 25px, glassMid 22px, liquidMid 15px (body + liquid)
-- corkMid 8px, corkDark 4px (cork)
+- outline 25px bbox[2,3,12,11] (cork+neck+body silhouette)
+- liquidLight 25px bbox[4,8,8,5], glassMid 22px bbox[3,6,10,8], liquidMid 15px bbox[4,7,8,6] (body + liquid)
+- corkMid 4px bbox[6,2,4,1], corkDark 4px bbox[6,1,4,1] (cork)
 - glassDark 5px (neck interior + right-edge shadow), glint 4px
 - Layers: 8, pixel overrides: 7

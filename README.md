@@ -38,7 +38,7 @@ A coherent 10-asset ladder (16×16 → 64×64) authored with the render → insp
 |---|---|
 | ![dragon](out/benchmark/creature64.png) | ![knight](out/benchmark/character64.png) |
 
-All 10 are hash-locked in `tests/test-suite.js` — any pixel change fails the suite.
+All 10 are hash-locked in `tests/test-suite.js` with full SHA-256 digests — any pixel change fails the suite.
 
 ### Earlier scenes
 
@@ -277,7 +277,7 @@ axe, dragon, knight — 16×16 → 64×64) is authored, coherence-reviewed, and
 hash-locked. The authoring workflow is packaged as installable agent skills
 (`skills/pixel-art-generation`, `skills/pixel-art-animation`).
 
-Documented next experiments (in `docs/FINDINGS.md` and `docs/tasks.md`):
+Documented next experiments (in `docs/FINDINGS.md` and `docs/plans/tasks.md`):
 
 1. Animation quality pass (§16): silhouette/palette stability, intentional motion
 2. Stress the repair loop: deliberately flawed scenes, measure render→inspect→fix cycles

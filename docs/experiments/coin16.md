@@ -5,7 +5,7 @@
 | Asset | 16×16 coin |
 | Model | orchestrator (direct) |
 | Iterations | 2 |
-| Total pixel modifications | 12 (emblem + highlight + shadow overrides; +12 after centering fix) |
+| Total pixel modifications | 12 (final override count: emblem + highlight + shadow overrides; the iteration-2 centering fix re-placed these 12 overrides) |
 | Final unexpected mutations | 0 |
 | Palette size | 7 (outline, rimDark, rimMid, faceMid, faceLight, accent, emblem) |
 | Structural issues | 0 |

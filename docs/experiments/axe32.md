@@ -4,10 +4,10 @@
 |---|---|
 | Asset | 32×32 axe (curved cutting edge, steel head, brass wedge, wooden haft) |
 | Model | orchestrator (direct) |
-| Iterations | 1 |
+| Iterations | 2 |
 | Total pixel modifications | 7 (cutting-edge highlight + back-edge light overrides) |
 | Final unexpected mutations | 0 |
-| Palette size | 10 (outline, steelDark, steelMid, steelLight, steelHighlight, woodDark, woodMid, woodLight, metalDark, metalMid) |
+| Palette size | 9 (outline, steelMid, steelLight, steelHighlight, woodDark, woodMid, woodLight, metalDark, metalMid) |
 | Structural issues | 0 |
 | Pixel-art issues | 0 |
 | Final assessment | production candidate |
@@ -20,6 +20,8 @@
    - wedge: rectout x=14..17 y=15..17 (metalDark ring) + metalMid interior
    - pixels: steelHighlight diagonal along cutting edge (6,12),(7,10),(8,8),(9,6); steelLight on back edge (23,5),(23,6),(23,7)
    - Diagnosis: none blocking. Layout verified: head y=4..16, wedge y=15..17, haft y=18..26, cap y=27..28; margins 4 top / 3 bottom, x=5..24 (margins 5/8). Head covers haft top; wedge covers head bottom + haft top junction.
+
+2. **Cleanup (review)** — removed unused `steelDark` palette key (was never painted; 9 colors final). Render unchanged (unused keys don't affect rasterization).
 
 ## Final inspect() summary
 
