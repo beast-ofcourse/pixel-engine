@@ -1364,7 +1364,7 @@ record, and no agent touches shared files (engine, tests, cli, tasks.md).
 
 - [x] All 10 assets hash-locked in `tests/test-suite.js`; suite green (127 passed, 0 failed)
 - [x] Asset-set coherence review (§15): palette/outline/lighting compatibility
-- [ ] Commit + report
+- [x] Commit + report
 
 ### §15 coherence review (10-asset benchmark set)
 
