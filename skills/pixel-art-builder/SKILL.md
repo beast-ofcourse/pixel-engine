@@ -7,18 +7,65 @@ description: Construct pixel-art assets with the pixel-engine. Use when building
 
 Build pixel art as structured scene documents, not pixel by pixel. The engine rasterizes shapes; you author shapes. Thousands of individual `set_pixel` calls are a failure mode, not a technique.
 
+## Primitive selection — choose the shape to the geometry
+
+The single most important construction decision is **which primitive fits the object's geometry**:
+
+- **Organic curved form** (creature, flame, leaf, cloth, horn, tail, head) → `poly` / `polyout` contour. Never a rectangle.
+- **Rectilinear form** (chest, building, platform, UI, mechanical block) → `rect` / `fill_region`.
+- **Rounded form** (coin, potion body, orb, wheel) → `ellipse`.
+- **Small detail** (eye, glint, seam, star) → pixel override or a tiny cluster.
+
+Rectangles are not forbidden — they are wrong only when the geometry is not rectangular. A creature built from rectangles is the classic failure; a chest built from polygons is equally wrong.
+
+## Contour-first construction (organic forms)
+
+For organic forms, construct the **outer contour before any interior work**:
+
+1. **Contour** — one `poly` (filled) for the whole silhouette: head + body + tail as a single outline, not per-part shapes.
+2. **Silhouette check** — render and verify the contour reads at native resolution before adding anything inside.
+3. **Interior fill** — belly, chest, wing membranes as separate `poly` layers inside the contour.
+4. **Major forms** — limbs, ears, horns, fins as their own shapes, overlapping the contour.
+5. **Shading** — dark/mid/light per material; upper-left lighting (light on top/left edges, shadow on bottom/right).
+6. **Pixel refinement** — sparse overrides for eyes, glints, claws, teeth.
+
+**One silhouette contour, not per-part outlines.** Outlining each part separately paints interior lines where parts overlap — the body's outline cuts across the head. Draw ONE `polyout` around the whole creature's outer edge, last.
+
+## Layer ordering rules
+
+The painter's algorithm decides what is visible. Order matters:
+
+1. Back forms first (tail behind body, far limbs behind torso).
+2. Interior fills (belly, membranes) after the main forms.
+3. Shade after interior fills — but **never after parts that must stay visible**: legs, feet, and overlapping parts are painted AFTER shade.
+4. The light underside (belly) is painted **after** the shade so the shade frames it — a full-width shade band otherwise covers the belly.
+5. Light/highlights after shade.
+6. **Outline LAST** — a single `polyout` contour on top of everything.
+
+## Part connection
+
+- Parts must **overlap** their neighbors — a tail that merely touches the body leaves transparent gaps at the junction.
+- Prefer **convex** part shapes. Concave thin polygons can produce degenerate scanline fills (odd edge crossings) that leave holes.
+- After rendering, zoom the junctions and verify no transparent pixels separate connected parts.
+
+## Small parts and outline thickness
+
+- Parts smaller than ~4px across should not carry their own outline — the outline swallows the interior. Let the main contour outline them.
+- Outline thickness is 1px. Shallow diagonal contour edges can paint 2px bands — check the silhouette for uneven thickness and adjust the contour points.
+- A tapered tip (tail, horn) naturally loses its interior to the outline — that is correct; the taper reads as a point.
+
 ## Construction pipeline
 
 silhouette → major forms → internal structure → palette → shading → highlights → details → cleanup
 
-1. **Silhouette** — outline shapes first (`draw_shape` with `poly`/`rect`/`ellipse` in the outline color). The silhouette must read at native resolution before any interior work.
+1. **Silhouette** — the contour-first procedure above (organic) or the rect/ellipse composition (rectilinear).
 2. **Major forms** — the big interior regions, back to front (painter's algorithm).
 3. **Internal structure** — sub-forms inside the major regions (windows, blades, faces, liquid).
 4. **Palette** — assign the planned named keys (5–12 colors, no dead keys). Editing a palette key's hex recolors every pixel using that key — the engine-native way to replace a color.
-5. **Shading** — dark/mid/light per material; upper-left lighting (light on top/left edges, shadow on bottom/right).
+5. **Shading** — dark/mid/light per material; upper-left lighting.
 6. **Highlights** — sparse bright pixels on lit edges.
 7. **Details** — sparse pixel overrides for the last 5% (glints, crosses, stars, seams).
-8. **Cleanup** — verify: no unused palette keys, no unexpected mutations, 1–2px margins, every key painted.
+8. **Cleanup** — verify: no unused palette keys, no unexpected mutations, 1–2px margins, every key painted, junctions connected.
 
 ## Bulk operations first
 
@@ -42,7 +89,7 @@ After each construction phase:
 3. `read_region(scene, x, y, w, h)` — full-resolution zoom on problem areas
 4. Diagnose, fix surgically, re-render
 
-Verify before concluding: silhouette bbox within 1–2px margins, every palette key painted, zero unexpected mutations.
+Verify before concluding: silhouette bbox within 1–2px margins, every palette key painted, zero unexpected mutations, all part junctions connected.
 
 ## API reference
 
