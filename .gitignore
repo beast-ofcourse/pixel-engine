@@ -1,0 +1,6 @@
+# Local tooling
+.codegraph/
+.playwright-mcp/
+.omo/
+node_modules/
+*.log
