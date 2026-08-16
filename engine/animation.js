@@ -43,9 +43,14 @@
   /** create_animation(width, height, opts?) -> empty animation document. opts: { fps?, background? } */
   function create_animation(width, height, opts) {
     opts = opts || {};
+    width = width || 16;
+    height = height || 16;
+    if (width !== height) {
+      throw new Error('animation must be square (got ' + width + 'x' + height + '); the engine rasterizes square scenes');
+    }
     return {
-      width: width || 16,
-      height: height || 16,
+      width: width,
+      height: height,
       fps: opts.fps || 8,
       background: opts.background !== undefined ? opts.background : null,
       palette: {},
@@ -67,17 +72,44 @@
     return fr.scene;
   }
 
+  /**
+   * nextFrameId(anim) -> next free frame-N id: one past the largest numeric
+   * suffix among existing ids, so delete/add/duplicate never collide.
+   */
+  function nextFrameId(anim) {
+    let max = -1;
+    for (const fr of anim.frames || []) {
+      const m = /^frame-(\d+)$/.exec(fr.id || '');
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+    return 'frame-' + (max + 1);
+  }
+
   /** normalize_animation(anim) -> same doc with defaults filled in (for loading JSON). */
   function normalize_animation(anim) {
     if (!anim.width) anim.width = anim.height || 16;
     if (!anim.height) anim.height = anim.width;
+    if (anim.width !== anim.height) {
+      throw new Error('animation must be square (got ' + anim.width + 'x' + anim.height + ')');
+    }
     if (!anim.fps) anim.fps = 8;
     if (!anim.palette) anim.palette = {};
     if (!anim.keyframes) anim.keyframes = {};
     if (!Array.isArray(anim.frames)) anim.frames = [];
-    anim.frames.forEach(function (fr, i) {
-      if (!fr.id) fr.id = 'frame-' + i;
+    const seen = new Set();
+    for (const fr of anim.frames) {
+      if (fr.id) {
+        if (seen.has(fr.id)) throw new Error('duplicate frame id: ' + fr.id);
+        seen.add(fr.id);
+      }
+    }
+    anim.frames.forEach(function (fr) {
+      if (!fr.id) fr.id = nextFrameId(anim);
+      if (!fr.scene) throw new Error('frame ' + fr.id + ' has no scene');
       if (!fr.scene.size) fr.scene.size = anim.width;
+      if (fr.scene.size !== anim.width) {
+        throw new Error('frame ' + fr.id + ' scene size ' + fr.scene.size + ' != animation ' + anim.width + 'x' + anim.height);
+      }
       seedPalette(fr.scene, anim.palette);
     });
     return anim;
@@ -100,7 +132,7 @@
       scene = PE.create_canvas(anim.width, anim.background);
     }
     seedPalette(scene, anim.palette);
-    const frame = { id: 'frame-' + anim.frames.length, scene: scene };
+    const frame = { id: nextFrameId(anim), scene: scene };
     anim.frames.push(frame);
     for (const key of Object.keys(scene.palette || {})) {
       if (!Object.prototype.hasOwnProperty.call(anim.palette, key)) anim.palette[key] = scene.palette[key];
@@ -112,7 +144,7 @@
   function duplicate_frame(anim, frameId) {
     const src = getFrame(anim, frameId);
     const scene = JSON.parse(JSON.stringify(src.scene));
-    const frame = { id: 'frame-' + anim.frames.length, scene: scene };
+    const frame = { id: nextFrameId(anim), scene: scene };
     anim.frames.push(frame);
     return frame.id;
   }
@@ -175,6 +207,8 @@
     const buf = PE.rasterize(scene);
     const x1 = Math.min(size, x + w), y1 = Math.min(size, y + h);
     const moved = [];
+    const writes = [];
+    const clears = [];
     for (let yy = Math.max(0, y); yy < y1; yy++) {
       for (let xx = Math.max(0, x); xx < x1; xx++) {
         const i = (yy * size + xx) * 4;
@@ -184,12 +218,16 @@
         }).join('');
         const nx = xx + dx, ny = yy + dy;
         if (nx >= 0 && ny >= 0 && nx < size && ny < size) {
-          PE.set_pixel(scene, nx, ny, hex);
+          writes.push({ x: nx, y: ny, hex: hex });
           moved.push({ x: xx, y: yy, to: [nx, ny] });
         }
-        PE.set_pixel(scene, xx, yy, null);
+        clears.push({ x: xx, y: yy });
       }
     }
+    // Clear every source pixel before writing destinations, so a source that
+    // overlaps an earlier destination cannot erase a pixel already written.
+    clears.forEach(function (p) { PE.set_pixel(scene, p.x, p.y, null); });
+    writes.forEach(function (p) { PE.set_pixel(scene, p.x, p.y, p.hex); });
     return { moved: moved.length };
   }
 
@@ -353,7 +391,14 @@
    */
   function encode_spritesheet(anim, opts) {
     opts = opts || {};
-    const columns = opts.columns || anim.frames.length;
+    if (!anim.frames || anim.frames.length === 0) {
+      throw new Error('cannot encode spritesheet: animation has no frames');
+    }
+    let columns = opts.columns;
+    if (columns === undefined || columns === null) columns = anim.frames.length;
+    if (!Number.isInteger(columns) || columns <= 0) {
+      throw new Error('columns must be a positive integer (got ' + columns + ')');
+    }
     const rows = Math.ceil(anim.frames.length / columns);
     const cw = anim.width, ch = anim.height;
     const sheet = new Uint8Array(columns * cw * rows * ch * 4);
@@ -390,6 +435,17 @@
     return Buffer.from(png).toString('base64');
   }
 
+  /** HTML-escape text before interpolating into the generated document. */
+  function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /** JSON for inline <script> embedding: <, >, & as \uXXXX so </script> cannot break out. */
+  function jsonSafe(o) {
+    return JSON.stringify(o).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+  }
+
   /**
    * animation_to_html(anim, opts?) -> self-contained HTML preview string.
    * opts: { scale?: number (default 8), title?: string }. Node: opts.path writes.
@@ -399,17 +455,18 @@
   function animation_to_html(anim, opts) {
     opts = opts || {};
     const scale = opts.scale || 8;
-    const title = opts.title || 'Pixel animation';
+    const title = escHtml(opts.title || 'Pixel animation');
     const frames = anim.frames.map(function (fr) {
-      const png = PE.encode_png(fr.scene);
-      const scene = JSON.parse(JSON.stringify(fr.scene));
-      for (const key of Object.keys(scene)) if (key[0] === '_') delete scene[key];
+      const scene = frameScene(anim, fr.id);
+      const png = PE.encode_png(scene);
+      const copy = JSON.parse(JSON.stringify(scene));
+      for (const key of Object.keys(copy)) if (key[0] === '_') delete copy[key];
       return {
         id: fr.id,
         keyframe: !!anim.keyframes[fr.id],
         b64: pngDataURL(png),
-        ascii: PE.read_region(fr.scene).replace(/&/g, '&amp;').replace(/</g, '&lt;'),
-        scene: scene
+        ascii: PE.read_region(scene).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+        scene: copy
       };
     });
     const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + title + '</title>' +
@@ -422,7 +479,7 @@
       'input{background:#222;color:#ddd;border:1px solid #444;padding:6px;width:56px;}' +
       '.key{color:#ffd34e;}' +
       '</style></head><body>' +
-      '<h1>' + title + ' — ' + anim.width + '×' + anim.height + ', ' + anim.frames.length + ' frames, ' + anim.fps + ' fps</h1>' +
+      '<h1>' + title + ' — ' + escHtml(anim.width) + '×' + escHtml(anim.height) + ', ' + escHtml(anim.frames.length) + ' frames, ' + escHtml(anim.fps) + ' fps</h1>' +
       '<canvas id="cv" width="' + (anim.width * scale) + '" height="' + (anim.height * scale) + '"></canvas>' +
       '<div style="margin:10px 0;">' +
       '<button id="play">Play</button>' +
@@ -430,7 +487,7 @@
       '<button id="prev">Prev</button>' +
       '<button id="next">Next</button>' +
       '<button id="step">Step</button>' +
-      '<span style="margin:0 10px;font-size:12px;">fps</span><input id="fps" value="' + anim.fps + '">' +
+      '<span style="margin:0 10px;font-size:12px;">fps</span><input id="fps" value="' + escHtml(anim.fps) + '">' +
       '<span id="frame-info" style="margin-left:14px;font-size:13px;"></span>' +
       '</div>' +
       '<div style="margin:6px 0;font-size:12px;" id="info">click canvas to inspect pixel</div>' +
@@ -438,10 +495,10 @@
       '<button onclick="dlSheet()">Export spritesheet PNG</button> ' +
       '<button onclick="toggleAscii()">Toggle ASCII (all frames)</button>' +
       '<pre id="ascii" style="display:none;">' + frames.map(function (f) {
-        return '-- ' + f.id + (f.keyframe ? ' (keyframe)' : '') + ' --\n' + f.ascii;
+        return '-- ' + escHtml(f.id) + (f.keyframe ? ' (keyframe)' : '') + ' --\n' + f.ascii;
       }).join('\n\n') + '</pre>' +
       '<script>' +
-      'var frames = ' + JSON.stringify(frames.map(function (f) { return { id: f.id, keyframe: f.keyframe, b64: f.b64, scene: f.scene }; })) + ';\n' +
+      'var frames = ' + jsonSafe(frames.map(function (f) { return { id: f.id, keyframe: f.keyframe, b64: f.b64, scene: f.scene }; })) + ';\n' +
       'var imgs = frames.map(function(f){ var im = new Image(); im.src = "data:image/png;base64," + f.b64; return im; });\n' +
       'imgs.forEach(function(im, i){ im.onload = function(){ if (i === idx) draw(); }; });\n' +
       'var idx = 0, playing = false, fps = ' + anim.fps + ', last = 0;\n' +
@@ -467,7 +524,8 @@
       '  var r = this.getBoundingClientRect();\n' +
       '  var x = Math.floor((e.clientX - r.left) * size / this.width);\n' +
       '  var y = Math.floor((e.clientY - r.top) * size / this.height);\n' +
-      '  var hex = window.PixelEngine ? window.PixelEngine.get_pixel(frames[idx].scene, x, y) : null;\n' +
+      '  var d = ctx.getImageData(x * scale, y * scale, 1, 1).data;\n' +
+      '  var hex = d[3] === 0 ? null : "#" + [d[0], d[1], d[2]].map(function(v){ return ("0" + v.toString(16)).slice(-2); }).join("");\n' +
       '  document.getElementById("info").textContent = "frame " + frames[idx].id + " (" + x + "," + y + ") -> " + (hex || "transparent");\n' +
       '});\n' +
       'function dl(){ var a = document.createElement("a"); a.href = imgs[idx].src; a.download = "frame.png"; a.click(); }\n' +

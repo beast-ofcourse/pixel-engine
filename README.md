@@ -164,7 +164,7 @@ node cli.js anim animations/ball.json --sheet out/ball-sheet.png --html out/ball
 
 ## CLI reference
 
-```
+```text
 node cli.js <scene.json> [--png out.png] [--html out.html]
                         [--zoom x,y,w,h] [--counts x,y,w,h] [--scale n]
 node cli.js anim <anim.json> [--diff a,b] [--validate a,b,x,y,w,h]
@@ -215,7 +215,7 @@ node cli.js anim <anim.json> [--diff a,b] [--validate a,b,x,y,w,h]
 
 ## Project structure
 
-```
+```text
 engine/pixel-engine.js   engine + tools (~700 lines, zero deps)
 engine/animation.js      animation subsystem: frames, exact diffing, validation, spritesheets
 tests/test-suite.js      104-test accuracy suite (node tests/test-suite.js)
@@ -246,7 +246,7 @@ experiments (in `docs/FINDINGS.md`):
 
 ## Known limitations
 
-- Experimental prototype: no CI, no packaging
+- Experimental prototype: no CI, no automated release pipeline (the npm package is published manually)
 - PNG encoder uses a hand-rolled fixed-Huffman DEFLATE (RFC 1951) — byte-valid
   (round-trip verified against zlib), but not the most compact compression
 - ASCII inspection is the agent's primary "eyes" — pixel probes and `inspect()` stats are more reliable than eyeballing ASCII rows (see FINDINGS §5)

@@ -22,8 +22,7 @@ function die(msg) {
 }
 
 if (process.argv[2] === 'anim') {
-  runAnim(process.argv.slice(3));
-  process.exit(0);
+  process.exit(runAnim(process.argv.slice(3)));
 }
 
 function parseArgs(argv) {
@@ -134,7 +133,12 @@ function runAnim(argv) {
     else if (a === '--ascii') opts.ascii = argv[++i];
     else if (a === '--sheet') opts.sheet = argv[++i];
     else if (a === '--html') opts.html = argv[++i];
-    else if (a === '--fps') opts.fps = parseInt(argv[++i], 10);
+    else if (a === '--fps') {
+      const raw = argv[++i];
+      const v = Number(raw);
+      if (!Number.isInteger(v) || v <= 0) die('--fps expects a positive integer, got: ' + raw);
+      opts.fps = v;
+    }
     else if (opts.file === null) opts.file = a;
     else die('unexpected argument: ' + a);
   }
@@ -179,6 +183,7 @@ function runAnim(argv) {
     for (const c of v.unexpected) {
       console.log('  unexpected (' + c.x + ',' + c.y + ')  ' + (c.old_value || 'transparent') + ' -> ' + (c.new_value || 'transparent'));
     }
+    if (!v.pass) return 1;
   }
 
   if (opts.ascii) {
@@ -196,4 +201,5 @@ function runAnim(argv) {
     PE.animation_to_html(anim, { path: opts.html, title: path.basename(opts.file, '.json') });
     console.log('wrote ' + opts.html);
   }
+  return 0;
 }

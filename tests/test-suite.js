@@ -1020,21 +1020,21 @@ test('set/get/clear frame pixel: override lifecycle', () => {
   assert.strictEqual(PA.get_frame_pixel(a, f, 9, 9), null);
 });
 
-test('move_frame_region: 2-frame experiment, exact diff (7 changed, bbox [2,2,3,3])', () => {
+test('move_frame_region: 2-frame experiment, exact diff (6 changed, bbox [2,2,3,3])', () => {
   const { a, f0 } = mkBallAnim();
   const f1 = PA.duplicate_frame(a, f0);
   PA.move_frame_region(a, f1, 2, 2, 2, 2, 1, 1);
   const d = PA.diff_frames(a, f0, f1);
-  assert.strictEqual(d.changed_pixels, 7);
-  assert.strictEqual(d.unchanged_pixels, 249);
-  assert.strictEqual(d.change_percentage, 2.73);
+  assert.strictEqual(d.changed_pixels, 6);
+  assert.strictEqual(d.unchanged_pixels, 250);
+  assert.strictEqual(d.change_percentage, 2.34);
   assert.deepStrictEqual(d.bounding_box, [2, 2, 3, 3]);
-  assert.strictEqual(d.changes.length, 7);
+  assert.strictEqual(d.changes.length, 6);
   assert.deepStrictEqual(d.changes[0], { x: 2, y: 2, old_value: '#e94560', new_value: '#1a1a2e' });
-  assert.deepStrictEqual(d.changes[4], { x: 4, y: 3, old_value: '#1a1a2e', new_value: '#e94560' });
-  assert.strictEqual(d.changes[6].x, 4);
-  assert.strictEqual(d.changes[6].y, 4);
-  assert.strictEqual(d.changes[6].new_value, '#e94560');
+  assert.deepStrictEqual(d.changes[4], { x: 3, y: 4, old_value: '#1a1a2e', new_value: '#e94560' });
+  assert.strictEqual(d.changes[5].x, 4);
+  assert.strictEqual(d.changes[5].y, 4);
+  assert.strictEqual(d.changes[5].new_value, '#e94560');
 });
 
 test('validate_change: PASS for covering region, FAIL with exact unexpected list', () => {
@@ -1043,11 +1043,11 @@ test('validate_change: PASS for covering region, FAIL with exact unexpected list
   PA.move_frame_region(a, f1, 2, 2, 2, 2, 1, 1);
   const pass = PA.validate_change(a, f0, f1, [2, 2, 4, 4]);
   assert.strictEqual(pass.pass, true);
-  assert.strictEqual(pass.total_changes, 7);
+  assert.strictEqual(pass.total_changes, 6);
   assert.strictEqual(pass.unexpected_changes, 0);
   const fail = PA.validate_change(a, f0, f1, [0, 0, 3, 3]);
   assert.strictEqual(fail.pass, false);
-  assert.strictEqual(fail.unexpected_changes, 6);
+  assert.strictEqual(fail.unexpected_changes, 5);
   assert.deepStrictEqual(fail.unexpected[0], { x: 3, y: 2, old_value: '#e94560', new_value: '#1a1a2e' });
 });
 
@@ -1285,6 +1285,142 @@ test('cli anim: exports sheet + html', () => {
     if (fs.existsSync(tmpSheet)) fs.unlinkSync(tmpSheet);
     if (fs.existsSync(tmpHtml)) fs.unlinkSync(tmpHtml);
   }
+});
+
+test('cli anim: --validate FAIL exits non-zero, PASS exits 0', () => {
+  let status = 0;
+  try {
+    runCli(['anim', 'animations/ball.json', '--validate', 'frame-0,frame-2,8,2,1,11']);
+  } catch (e) {
+    status = e.status;
+  }
+  assert.strictEqual(status, 1);
+  const ok = runCli(['anim', 'animations/ball.json', '--validate', 'frame-0,frame-2,5,2,7,11']);
+  assert.ok(/PASS/.test(ok));
+});
+
+test('cli anim: --fps rejects partial/zero/negative/non-numeric, accepts positive int', () => {
+  for (const bad of ['0', '-5', '8fps', 'abc', '2.5']) {
+    let status = 0;
+    try {
+      runCli(['anim', 'animations/ball.json', '--fps', bad]);
+    } catch (e) {
+      status = e.status;
+    }
+    assert.strictEqual(status, 1, '--fps ' + bad + ' must fail');
+  }
+  const out = runCli(['anim', 'animations/ball.json', '--fps', '12']);
+  assert.ok(/12 fps/.test(out));
+});
+
+test('create_animation: non-square rejected', () => {
+  assert.throws(() => PA.create_animation(16, 8), /square/);
+});
+
+test('normalize_animation: non-square or inconsistent dims rejected', () => {
+  assert.throws(() => PA.normalize_animation({ width: 16, height: 8, frames: [] }), /square/);
+  assert.throws(() => PA.normalize_animation({
+    width: 16, height: 16, frames: [{ id: 'f', scene: { size: 8 } }]
+  }), /size 8 != animation 16x16/);
+});
+
+test('frame ids: delete + add/duplicate never collide (shared allocator)', () => {
+  const a = PA.create_animation(4, 4);
+  const f0 = PA.add_frame(a);
+  const f1 = PA.add_frame(a);
+  const f2 = PA.add_frame(a);
+  PA.delete_frame(a, f1);
+  const f3 = PA.add_frame(a);
+  assert.strictEqual(f3, 'frame-3');
+  assert.deepStrictEqual(PA.frame_ids(a), ['frame-0', 'frame-2', 'frame-3']);
+  const f4 = PA.duplicate_frame(a, f0);
+  assert.strictEqual(f4, 'frame-4');
+  assert.deepStrictEqual(PA.frame_ids(a), ['frame-0', 'frame-2', 'frame-3', 'frame-4']);
+});
+
+test('normalize_animation: missing ids allocated without collision, duplicates rejected', () => {
+  const a = { width: 4, height: 4, frames: [
+    { id: 'frame-0', scene: { size: 4 } },
+    { scene: { size: 4 } },
+    { id: 'frame-2', scene: { size: 4 } }
+  ] };
+  PA.normalize_animation(a);
+  assert.deepStrictEqual(PA.frame_ids(a), ['frame-0', 'frame-3', 'frame-2']);
+  const dup = { width: 4, height: 4, frames: [
+    { id: 'frame-0', scene: { size: 4 } },
+    { id: 'frame-0', scene: { size: 4 } }
+  ] };
+  assert.throws(() => PA.normalize_animation(dup), /duplicate frame id/);
+});
+
+test('move_frame_region: overlapping move clears sources before writing destinations', () => {
+  const a = PA.create_animation(4, 4);
+  const f = PA.add_frame(a);
+  PA.fill_frame_region(a, f, 0, 0, 4, 4, '#000000');
+  PA.set_frame_pixel(a, f, 1, 1, '#ff0000');
+  PA.set_frame_pixel(a, f, 2, 1, '#00ff00');
+  const r = PA.move_frame_region(a, f, 1, 1, 2, 1, 1, 0);
+  assert.strictEqual(r.moved, 2);
+  assert.strictEqual(PA.get_frame_pixel(a, f, 1, 1), '#000000');
+  assert.strictEqual(PA.get_frame_pixel(a, f, 2, 1), '#ff0000');
+  assert.strictEqual(PA.get_frame_pixel(a, f, 3, 1), '#00ff00');
+});
+
+test('encode_spritesheet: empty animation rejected', () => {
+  const a = PA.create_animation(4, 4);
+  assert.throws(() => PA.encode_spritesheet(a), /no frames/);
+});
+
+test('encode_spritesheet: invalid columns rejected', () => {
+  const { a } = mkBallAnim();
+  assert.throws(() => PA.encode_spritesheet(a, { columns: 0 }), /columns/);
+  assert.throws(() => PA.encode_spritesheet(a, { columns: -1 }), /columns/);
+  assert.throws(() => PA.encode_spritesheet(a, { columns: 1.5 }), /columns/);
+});
+
+test('animation_to_html: renders the seeded frame scene (palette added after frame)', () => {
+  const a = PA.create_animation(4, 4);
+  PA.add_frame(a);
+  a.palette.extra = '#ff00ff';
+  const html = PA.animation_to_html(a, { title: 'seed' });
+  assert.ok(html.indexOf('"extra":"#ff00ff"') !== -1);
+});
+
+test('animation_to_html: title is HTML-escaped', () => {
+  const { a } = mkBallAnim();
+  const html = PA.animation_to_html(a, { title: '<script>alert(1)</script>' });
+  assert.strictEqual(html.indexOf('<script>alert(1)</script>'), -1);
+  assert.ok(html.indexOf('&lt;script&gt;alert(1)&lt;/script&gt;') !== -1);
+});
+
+test('animation_to_html: frame data serialized with unicode escapes (no </script> breakout)', () => {
+  const a = PA.create_animation(4, 4);
+  PA.add_frame(a);
+  a.frames[0].id = '</script><script>alert(1)</script>';
+  const html = PA.animation_to_html(a, { title: 'xss' });
+  assert.strictEqual(html.indexOf('</script><script>alert(1)</script>'), -1);
+  assert.ok(html.indexOf('\\u003c/script\\u003e') !== -1);
+});
+
+test('animation_to_html: click-to-inspect reads the canvas (getImageData), not window.PixelEngine', () => {
+  const { a } = mkBallAnim();
+  const html = PA.animation_to_html(a, { title: 'inspect' });
+  assert.strictEqual(html.indexOf('window.PixelEngine'), -1);
+  assert.ok(html.indexOf('ctx.getImageData(x * scale, y * scale, 1, 1).data') !== -1);
+  const m = html.match(/cv\.addEventListener\("click", function\(e\)\{([\s\S]*?)\}\);/);
+  assert.ok(m, 'click handler found in generated html');
+  const fn = new Function('ctx', 'size', 'scale', 'frames', 'idx', 'document', 'return function(e){' + m[1] + '};');
+  const stubCanvas = { width: 128, height: 128, getBoundingClientRect: function () { return { left: 0, top: 0 }; } };
+  const info = { textContent: '' };
+  const stubDoc = { getElementById: function () { return info; } };
+  const calls = [];
+  const opaque = fn({ getImageData: function (x, y) { calls.push([x, y]); return { data: Uint8Array.from([233, 69, 96, 255]) }; } }, 16, 8, [{ id: 'frame-0' }], 0, stubDoc);
+  opaque.call(stubCanvas, { clientX: 64, clientY: 40 });
+  assert.strictEqual(info.textContent, 'frame frame-0 (8,5) -> #e94560');
+  assert.deepStrictEqual(calls[0], [64, 40]); // sampled at scaled canvas coords (scale 8)
+  const transparent = fn({ getImageData: function () { return { data: Uint8Array.from([0, 0, 0, 0]) }; } }, 16, 8, [{ id: 'frame-0' }], 0, stubDoc);
+  transparent.call(stubCanvas, { clientX: 64, clientY: 40 });
+  assert.strictEqual(info.textContent, 'frame frame-0 (8,5) -> transparent');
 });
 
 // ---------------------------------------------------------------------------

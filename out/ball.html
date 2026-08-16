@@ -102,7 +102,8 @@ cv.addEventListener("click", function(e){
   var r = this.getBoundingClientRect();
   var x = Math.floor((e.clientX - r.left) * size / this.width);
   var y = Math.floor((e.clientY - r.top) * size / this.height);
-  var hex = window.PixelEngine ? window.PixelEngine.get_pixel(frames[idx].scene, x, y) : null;
+  var d = ctx.getImageData(x * scale, y * scale, 1, 1).data;
+  var hex = d[3] === 0 ? null : "#" + [d[0], d[1], d[2]].map(function(v){ return ("0" + v.toString(16)).slice(-2); }).join("");
   document.getElementById("info").textContent = "frame " + frames[idx].id + " (" + x + "," + y + ") -> " + (hex || "transparent");
 });
 function dl(){ var a = document.createElement("a"); a.href = imgs[idx].src; a.download = "frame.png"; a.click(); }
