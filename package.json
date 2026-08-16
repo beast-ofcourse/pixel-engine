@@ -1,7 +1,7 @@
 {
   "name": "pixel-engine-zero",
-  "version": "1.0.0",
-  "description": "Zero-dependency declarative pixel-art engine: JSON scene documents (layers, palette, sparse pixel overrides) rasterized to RGBA and PNG, with inspection tools for LLM-driven construction.",
+  "version": "1.1.0",
+  "description": "Zero-dependency declarative pixel-art engine: JSON scene documents (layers, palette, sparse pixel overrides) rasterized to RGBA and PNG, with inspection tools for LLM-driven construction, plus an animation subsystem (frames, exact diffing, region validation, spritesheet export).",
   "main": "engine/pixel-engine.js",
   "bin": {
     "pixel-engine": "cli.js"
@@ -10,6 +10,7 @@
     "engine/",
     "cli.js",
     "scenes/",
+    "animations/",
     "README.md",
     "LICENSE"
   ],

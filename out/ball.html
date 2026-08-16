@@ -1,0 +1,114 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>ball</title><style>body{font-family:ui-monospace,Consolas,monospace;background:#111;color:#ddd;margin:24px;}h1{font-size:16px;color:#888;font-weight:400;}canvas{image-rendering:pixelated;image-rendering:crisp-edges;border:1px solid #333;background:repeating-conic-gradient(#2a2a2a 0 25%,#222 0 50%) 0 0/16px 16px;}pre{background:#0c0c0c;border:1px solid #2a2a2a;padding:12px;font-size:11px;line-height:1.15;overflow:auto;white-space:pre;}button{background:#222;color:#ddd;border:1px solid #444;padding:6px 14px;cursor:pointer;margin-right:6px;}input{background:#222;color:#ddd;border:1px solid #444;padding:6px;width:56px;}.key{color:#ffd34e;}</style></head><body><h1>ball — 16×16, 4 frames, 8 fps</h1><canvas id="cv" width="128" height="128"></canvas><div style="margin:10px 0;"><button id="play">Play</button><button id="restart">Restart</button><button id="prev">Prev</button><button id="next">Next</button><button id="step">Step</button><span style="margin:0 10px;font-size:12px;">fps</span><input id="fps" value="8"><span id="frame-info" style="margin-left:14px;font-size:13px;"></span></div><div style="margin:6px 0;font-size:12px;" id="info">click canvas to inspect pixel</div><button onclick="dl()">Export current frame PNG</button> <button onclick="dlSheet()">Export spritesheet PNG</button> <button onclick="toggleAscii()">Toggle ASCII (all frames)</button><pre id="ascii" style="display:none;">-- frame-0 (keyframe) --
+region x=0 y=0 w=16 h=16 scale=1 (16x16)
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBAAAABBBBBB
+BBBBBAAAHHABBBBB
+BBBBBAAAHHABBBBB
+BBBBBAAAAAABBBBB
+BBBBBAAAAAABBBBB
+BBBBBBAAAABBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBSSSSSSBBBBB
+BBBBBSSSSSSBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+legend: S=shadow #0f0f1e  B=bg #1a1a2e  A=ball #e94560  H=highlight #f5e6ca  .=transparent
+
+-- frame-1 --
+region x=0 y=0 w=16 h=16 scale=1 (16x16)
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBAAAABBBBBB
+BBBBBAAAHHABBBBB
+BBBBBAAAHHABBBBB
+BBBBBAAAAAABBBBB
+BBBBBAAAAAABBBBB
+BBBBBBAAAABBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBSSSSSSBBBBB
+BBBBBSSSSSSBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+legend: S=shadow #0f0f1e  B=bg #1a1a2e  A=ball #e94560  H=highlight #f5e6ca  .=transparent
+
+-- frame-2 --
+region x=0 y=0 w=16 h=16 scale=1 (16x16)
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBAAAABBBBBB
+BBBBBAAAHHABBBBB
+BBBBBAAAHHABBBBB
+BBBBBAAAAAABBBBB
+BBBBBAAAAAABBBBB
+BBBBBBAAAABBBBBB
+BBBBBSSSSSSBBBBB
+BBBBBSSSSSSBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+legend: S=shadow #0f0f1e  B=bg #1a1a2e  A=ball #e94560  H=highlight #f5e6ca  .=transparent
+
+-- frame-3 --
+region x=0 y=0 w=16 h=16 scale=1 (16x16)
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBAAAABBBBBB
+BBBBBAAAHHABBBBB
+BBBBBAAAHHABBBBB
+BBBBBAAAAAABBBBB
+BBBBBAAAAAABBBBB
+BBBBBBAAAABBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBSSSSSSBBBBB
+BBBBBSSSSSSBBBBB
+BBBBBBBBBBBBBBBB
+BBBBBBBBBBBBBBBB
+legend: S=shadow #0f0f1e  B=bg #1a1a2e  A=ball #e94560  H=highlight #f5e6ca  .=transparent</pre><script>var frames = [{"id":"frame-0","keyframe":true,"b64":"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAaElEQVR4AWOQktL7TwmmnQEvXRP+I2NcrsTqAmSNX5+d+g/CIDFshtDeAJDNMEyWC2CaQTTRBoAUgjQgY5AYNow1DLApxCU2XA3g55f7jw1jCwesYYBNM0iMaAOwKcQlhtUFuBRjEwcAmcaJJKUsxkMAAAAASUVORK5CYII=","scene":{"size":16,"palette":{"bg":"#1A1A2E","ball":"#E94560","highlight":"#F5E6CA","shadow":"#0F0F1E"},"layers":[{"id":"bg","type":"fill","color":"bg"},{"id":"shadow","type":"ellipse","cx":8,"cy":13,"rx":3,"ry":1,"color":"shadow"},{"id":"ball","type":"ellipse","cx":8,"cy":5,"rx":3,"ry":3,"color":"ball"},{"id":"highlight","type":"ellipse","cx":9,"cy":4,"rx":1,"ry":1,"color":"highlight"}],"pixels":{}}},{"id":"frame-1","keyframe":false,"b64":"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAaElEQVR4AWOQktL7Twkezga8dE34j4xxhRPWMEDW+PXZqf8gDBLDZgjtDQDZDMNkuQCmGUQTbQBIIUgDMgaJYcNYwwCbQlxitDGAn1/uPzaMzRVYXYBNM0iMaAOwKcQlhtUFuBRjEwcAVtOJJENwYogAAAAASUVORK5CYII=","scene":{"size":16,"palette":{"bg":"#1A1A2E","ball":"#E94560","highlight":"#F5E6CA","shadow":"#0F0F1E"},"layers":[{"id":"bg","type":"fill","color":"bg"},{"id":"shadow","type":"ellipse","cx":8,"cy":13,"rx":3,"ry":1,"color":"shadow"},{"id":"ball","type":"ellipse","cx":8,"cy":7,"rx":3,"ry":3,"color":"ball"},{"id":"highlight","type":"ellipse","cx":9,"cy":6,"rx":1,"ry":1,"color":"highlight"}],"pixels":{}}},{"id":"frame-2","keyframe":false,"b64":"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAXElEQVR4AWOQktL7TwkeNUDvP+3C4KVrwn9kjCumsLoAWePXZ6f+gzBIDJshtDcAZDMMk+UCmGYQTbQBIIUgDcgYJIYNYw0Dfn65/9gw/QzAZhMuMaxewKUYmzgAE+CJJGkCfG0AAAAASUVORK5CYII=","scene":{"size":16,"palette":{"bg":"#1A1A2E","ball":"#E94560","highlight":"#F5E6CA","shadow":"#0F0F1E"},"layers":[{"id":"bg","type":"fill","color":"bg"},{"id":"shadow","type":"ellipse","cx":8,"cy":13,"rx":3,"ry":1,"color":"shadow"},{"id":"ball","type":"ellipse","cx":8,"cy":9,"rx":3,"ry":3,"color":"ball"},{"id":"highlight","type":"ellipse","cx":9,"cy":8,"rx":1,"ry":1,"color":"highlight"}],"pixels":{}}},{"id":"frame-3","keyframe":false,"b64":"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAaElEQVR4AWOQktL7Twkezga8dE34j4xxhRPWMEDW+PXZqf8gDBLDZgjtDQDZDMNkuQCmGUQTbQBIIUgDMgaJYcNYwwCbQlxitDGAn1/uPzaMzRVYXYBNM0iMaAOwKcQlhtUFuBRjEwcAVtOJJENwYogAAAAASUVORK5CYII=","scene":{"size":16,"palette":{"bg":"#1A1A2E","ball":"#E94560","highlight":"#F5E6CA","shadow":"#0F0F1E"},"layers":[{"id":"bg","type":"fill","color":"bg"},{"id":"shadow","type":"ellipse","cx":8,"cy":13,"rx":3,"ry":1,"color":"shadow"},{"id":"ball","type":"ellipse","cx":8,"cy":7,"rx":3,"ry":3,"color":"ball"},{"id":"highlight","type":"ellipse","cx":9,"cy":6,"rx":1,"ry":1,"color":"highlight"}],"pixels":{}}}];
+var imgs = frames.map(function(f){ var im = new Image(); im.src = "data:image/png;base64," + f.b64; return im; });
+imgs.forEach(function(im, i){ im.onload = function(){ if (i === idx) draw(); }; });
+var idx = 0, playing = false, fps = 8, last = 0;
+var cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+var scale = 8, size = 16;
+function draw(){
+  ctx.drawImage(imgs[idx], 0, 0, cv.width, cv.height);
+  var f = frames[idx];
+  document.getElementById("frame-info").textContent = "frame " + (idx + 1) + "/" + frames.length + " (" + f.id + (f.keyframe ? ", keyframe" : "") + ")";
+}
+function tick(t){
+  if (playing) { if (t - last >= 1000 / fps) { last = t; idx = (idx + 1) % frames.length; draw(); } }
+  requestAnimationFrame(tick);
+}
+document.getElementById("play").onclick = function(){ playing = !playing; this.textContent = playing ? "Pause" : "Play"; };
+document.getElementById("restart").onclick = function(){ idx = 0; draw(); };
+document.getElementById("prev").onclick = function(){ idx = (idx - 1 + frames.length) % frames.length; draw(); };
+document.getElementById("next").onclick = function(){ idx = (idx + 1) % frames.length; draw(); };
+document.getElementById("step").onclick = function(){ idx = (idx + 1) % frames.length; draw(); };
+document.getElementById("fps").onchange = function(){ var v = parseInt(this.value, 10); if (v > 0) fps = v; };
+cv.addEventListener("click", function(e){
+  var r = this.getBoundingClientRect();
+  var x = Math.floor((e.clientX - r.left) * size / this.width);
+  var y = Math.floor((e.clientY - r.top) * size / this.height);
+  var d = ctx.getImageData(x * scale, y * scale, 1, 1).data;
+  var hex = d[3] === 0 ? null : "#" + [d[0], d[1], d[2]].map(function(v){ return ("0" + v.toString(16)).slice(-2); }).join("");
+  document.getElementById("info").textContent = "frame " + frames[idx].id + " (" + x + "," + y + ") -> " + (hex || "transparent");
+});
+function dl(){ var a = document.createElement("a"); a.href = imgs[idx].src; a.download = "frame.png"; a.click(); }
+function dlSheet(){ var a = document.createElement("a"); a.href = sheetUrl; a.download = "spritesheet.png"; a.click(); }
+var sheetUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAQCAYAAACm53kpAAABD0lEQVR4AWOQktL7P5LxaADgiv2Xrgn/kTEudUNdHGsKQPb412en/oMwSGyoexab+2kWAKAAQ8bYLKelGLLdIDYuuwgGAEgzDOMyBF0cph5Eg1IPCIPY6OpoxQfZBcMgu0EYxMdm36ANAJCDkTE2x+MSQ9YH8jwIg8SwqccaACCFIA3IGCRGLEbWh8wmRz/I8SAMMocc/SB9MIxNP84AwKaYWDGYheg0OfpBngdhkFnk6Afpg2Fs+mkSACCLYJbCaJAYsRimB50mVj9IHbF6aRYAIEeQi9EdD+OTax4+fYMyAEAOhnkaRoPEaIGxBgA/v9x/bJhYB2DTCxIbjPpHA4DYWBmu6rCmgOHqWWz+AgDNuiSrfdLq2gAAAABJRU5ErkJggg==";
+function toggleAscii(){ var p = document.getElementById("ascii"); p.style.display = p.style.display === "none" ? "block" : "none"; }
+draw(); requestAnimationFrame(tick);
+</script></body></html>
