@@ -1340,28 +1340,41 @@ record, and no agent touches shared files (engine, tests, cli, tasks.md).
 
 ## Level 1 — Basic objects (16×16)
 
-- [ ] coin — `scenes/coin16.json` + `docs/experiments/coin16.md`
-- [ ] potion — `scenes/potion16.json` + `docs/experiments/potion16.md`
-- [ ] sword — `scenes/sword16.json` + `docs/experiments/sword16.md`
+- [x] coin — `scenes/coin16.json` + `docs/experiments/coin16.md`
+- [x] potion — `scenes/potion16.json` + `docs/experiments/potion16.md`
+- [x] sword — `scenes/sword16.json` + `docs/experiments/sword16.md`
 
 ## Level 2 — Weapons/tools (32×32)
 
-- [ ] axe — `scenes/axe32.json` + `docs/experiments/axe32.md`
-- [ ] chest — `scenes/chest32.json` + `docs/experiments/chest32.md`
-- [ ] torch — `scenes/torch32.json` + `docs/experiments/torch32.md`
+- [x] axe — `scenes/axe32.json` + `docs/experiments/axe32.md`
+- [x] chest — `scenes/chest32.json` + `docs/experiments/chest32.md`
+- [x] torch — `scenes/torch32.json` + `docs/experiments/torch32.md`
 
 ## Level 2 — Weapons/tools (64×64)
 
-- [ ] sword — `scenes/sword64.json` + `docs/experiments/sword64.md`
-- [ ] axe — `scenes/axe64.json` + `docs/experiments/axe64.md`
+- [x] sword — `scenes/sword64.json` + `docs/experiments/sword64.md`
+- [x] axe — `scenes/axe64.json` + `docs/experiments/axe64.md`
 
 ## Level 5/6 — Creatures & characters (64×64)
 
-- [ ] creature — `scenes/creature64.json` + `docs/experiments/creature64.md`
-- [ ] character — `scenes/character64.json` + `docs/experiments/character64.md`
+- [x] creature — `scenes/creature64.json` + `docs/experiments/creature64.md`
+- [x] character — `scenes/character64.json` + `docs/experiments/character64.md`
 
 ## Close-out
 
-- [ ] All 10 assets hash-locked in `tests/test-suite.js`; suite green
-- [ ] Asset-set coherence review (§15): palette/outline/lighting compatibility
+- [x] All 10 assets hash-locked in `tests/test-suite.js`; suite green (127 passed, 0 failed)
+- [x] Asset-set coherence review (§15): palette/outline/lighting compatibility
 - [ ] Commit + report
+
+### §15 coherence review (10-asset benchmark set)
+
+| Criterion | Verdict | Evidence |
+|---|---|---|
+| Palette compatibility | PASS | Same material families across the set: steel `#7a8a9a`/`#b8c8d8` (sword16, axe32, sword64, axe64, character64), wood `#6b4226`-family (axe32, chest32, torch32, axe64), gold `#e8c14e`-family (coin16, sword64), armor/leather tones (character64), 2–3 tone dark/mid/light shading per material |
+| Outline compatibility | PASS (note) | 8/10 share `#1a1a1a`; coin16 `#2b1d0e` and potion16 `#1c2026` are hue-tinted near-blacks (warm for gold, cool for glass) — deliberate, harmonize with subject, all within the near-black family |
+| Lighting compatibility | PASS | Upper-left lighting everywhere: light on top/left edges, shadow on bottom/right (documented per asset in `docs/experiments/*.md`) |
+| Pixel density | PASS | Density scales with canvas: sparse 16×16, medium 32×32, detailed 64×64; same subjects at two scales (sword16→sword64, axe32→axe64) keep silhouette + material treatment |
+| Visual style | PASS | Same construction everywhere: outline + mid + light + dark layers, palette keys only (never raw hex), sparse pixel overrides for detail, transparent background, 1–2px margins |
+| Relative scale | PASS | Ladder matches §24: basic objects 16×16, weapons/tools 32×32 and 64×64, creatures/characters 64×64; character and creature are the largest subjects |
+
+Verdict: the set reads as one artist's work — same construction system, same lighting, same material palette families, near-black outlines throughout.

@@ -754,6 +754,57 @@ test('landscape256: rasterize hash locked (engine == browser verified)', () => {
   assert.strictEqual(hash16(PE.rasterize(s)), '5192f4c37ca56c03');
 });
 
+// benchmark ladder assets (§24 of docs/tasks.md) — hash-locked
+test('coin16: rasterize hash locked', () => {
+  const s = loadScene('coin16');
+  assert.strictEqual(hash16(PE.rasterize(s)), '5d789eb4cafb49ef');
+});
+
+test('potion16: rasterize hash locked', () => {
+  const s = loadScene('potion16');
+  assert.strictEqual(hash16(PE.rasterize(s)), '7987267218bfed46');
+});
+
+test('sword16: rasterize hash locked', () => {
+  const s = loadScene('sword16');
+  assert.strictEqual(hash16(PE.rasterize(s)), '1e3e27a8094f2a50');
+});
+
+test('axe32: rasterize hash locked', () => {
+  const s = loadScene('axe32');
+  assert.strictEqual(hash16(PE.rasterize(s)), '1c9e9b384dc76510');
+});
+
+test('chest32: rasterize hash locked', () => {
+  const s = loadScene('chest32');
+  assert.strictEqual(hash16(PE.rasterize(s)), '939b4d9e37458acd');
+});
+
+test('torch32: rasterize hash locked', () => {
+  const s = loadScene('torch32');
+  assert.strictEqual(hash16(PE.rasterize(s)), '88fff1bd3bfc01d0');
+});
+
+test('sword64: rasterize hash locked', () => {
+  const s = loadScene('sword64');
+  assert.strictEqual(hash16(PE.rasterize(s)), 'a03ead8e11b582e0');
+});
+
+test('axe64: rasterize hash locked', () => {
+  const s = loadScene('axe64');
+  assert.strictEqual(hash16(PE.rasterize(s)), 'f2e4056dd3204e85');
+});
+
+test('character64: rasterize hash locked', () => {
+  const s = loadScene('character64');
+  assert.strictEqual(hash16(PE.rasterize(s)), '24e275aad9bbfaea');
+});
+
+test('creature64: rasterize hash locked', () => {
+  const s = loadScene('creature64');
+  assert.strictEqual(hash16(PE.rasterize(s)), '8b7bb303b3c8b02a');
+});
+
 test('house128: known pixel probes (browser-verified)', () => {
   const s = loadScene('house128');
   assert.strictEqual(PE.get_pixel(s, 10, 10), '#7ec8e3');    // sky

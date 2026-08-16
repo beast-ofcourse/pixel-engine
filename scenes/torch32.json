@@ -1,0 +1,33 @@
+{
+  "size": 32,
+  "palette": {
+    "outline": "#1a1a1a",
+    "woodDark": "#4a2c10",
+    "woodMid": "#7a4a1e",
+    "woodLight": "#a06a30",
+    "wrapDark": "#5a3a18",
+    "wrapMid": "#8a5a28",
+    "wrapLight": "#b07a3a",
+    "flameOuter": "#d4551a",
+    "flameMid": "#f08a1e",
+    "flameInner": "#ffd23e",
+    "flameCore": "#fff8d8"
+  },
+  "layers": [
+    { "id": "handleOutline", "type": "rect", "x": 14, "y": 21, "w": 4, "h": 9, "color": "outline" },
+    { "id": "handleWood", "type": "rect", "x": 15, "y": 21, "w": 2, "h": 9, "color": "woodMid" },
+    { "id": "handleLight", "type": "rect", "x": 15, "y": 21, "w": 1, "h": 9, "color": "woodLight" },
+    { "id": "handleCap", "type": "rect", "x": 14, "y": 28, "w": 4, "h": 2, "color": "woodDark" },
+    { "id": "headOutline", "type": "rect", "x": 12, "y": 15, "w": 8, "h": 6, "color": "outline" },
+    { "id": "headWrap", "type": "rect", "x": 13, "y": 15, "w": 6, "h": 6, "color": "wrapMid" },
+    { "id": "headWrapDark", "type": "rect", "x": 13, "y": 15, "w": 6, "h": 2, "color": "wrapDark" },
+    { "id": "headWrapLight", "type": "rect", "x": 13, "y": 15, "w": 1, "h": 6, "color": "wrapLight" },
+    { "id": "flameOuter", "type": "ellipse", "cx": 16, "cy": 10, "rx": 4.5, "ry": 5.5, "color": "flameOuter" },
+    { "id": "flameMid", "type": "ellipse", "cx": 16, "cy": 10, "rx": 3, "ry": 4, "color": "flameMid" },
+    { "id": "flameInner", "type": "ellipse", "cx": 16, "cy": 10.5, "rx": 2, "ry": 2.5, "color": "flameInner" }
+  ],
+  "pixels": {
+    "16,4": "flameOuter",
+    "15,10": "flameCore", "16,9": "flameCore", "16,10": "flameCore", "16,11": "flameCore", "17,10": "flameCore"
+  }
+}

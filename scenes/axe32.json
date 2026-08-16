@@ -1,0 +1,30 @@
+{
+  "size": 32,
+  "palette": {
+    "outline": "#1a1a1a",
+    "steelDark": "#5a6a7a",
+    "steelMid": "#8a9aaa",
+    "steelLight": "#c0d0e0",
+    "steelHighlight": "#e8f4ff",
+    "woodDark": "#4a2c10",
+    "woodMid": "#7a4a1e",
+    "woodLight": "#a06a30",
+    "metalDark": "#6a4a14",
+    "metalMid": "#b8860b"
+  },
+  "layers": [
+    { "id": "haftOutline", "type": "rect", "x": 14, "y": 8, "w": 4, "h": 21, "color": "outline" },
+    { "id": "haftWood", "type": "rect", "x": 15, "y": 8, "w": 2, "h": 21, "color": "woodMid" },
+    { "id": "haftLight", "type": "rect", "x": 15, "y": 8, "w": 1, "h": 21, "color": "woodLight" },
+    { "id": "haftCap", "type": "rect", "x": 14, "y": 27, "w": 4, "h": 2, "color": "woodDark" },
+    { "id": "headOutline", "type": "poly", "points": [[5,13],[7,6],[13,4],[24,4],[24,16],[15,16],[5,13]], "color": "outline" },
+    { "id": "headSteel", "type": "poly", "points": [[6,12],[8,7],[13,5],[23,5],[23,15],[16,15],[6,12]], "color": "steelMid" },
+    { "id": "headLight", "type": "poly", "points": [[7,11],[9,8],[13,6],[22,6],[22,14],[17,14],[7,11]], "color": "steelLight" },
+    { "id": "wedgeOutline", "type": "rectout", "x": 14, "y": 15, "w": 4, "h": 3, "t": 1, "color": "metalDark" },
+    { "id": "wedgeMid", "type": "rect", "x": 15, "y": 15, "w": 2, "h": 3, "color": "metalMid" }
+  ],
+  "pixels": {
+    "6,12": "steelHighlight", "7,10": "steelHighlight", "8,8": "steelHighlight", "9,6": "steelHighlight",
+    "23,5": "steelLight", "23,6": "steelLight", "23,7": "steelLight"
+  }
+}

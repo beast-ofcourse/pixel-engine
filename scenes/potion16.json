@@ -1,0 +1,27 @@
+{
+  "size": 16,
+  "palette": {
+    "outline": "#1c2026",
+    "glassDark": "#33505e",
+    "glassMid": "#4a7384",
+    "liquidMid": "#a82a42",
+    "liquidLight": "#d6556b",
+    "corkDark": "#5a3a18",
+    "corkMid": "#8a5a28",
+    "glint": "#d8eef5"
+  },
+  "layers": [
+    { "id": "bodyOutline", "type": "ellipse", "cx": 8, "cy": 10, "rx": 6.5, "ry": 5, "color": "outline" },
+    { "id": "neckOutline", "type": "rect", "x": 6, "y": 3, "w": 4, "h": 3, "color": "outline" },
+    { "id": "neckGlass", "type": "rect", "x": 7, "y": 4, "w": 2, "h": 1, "color": "glassDark" },
+    { "id": "bodyGlass", "type": "ellipse", "cx": 8, "cy": 10, "rx": 5.5, "ry": 4, "color": "glassMid" },
+    { "id": "liquid", "type": "ellipse", "cx": 8, "cy": 10, "rx": 4.5, "ry": 3.5, "color": "liquidMid" },
+    { "id": "liquidLight", "type": "ellipse", "cx": 8, "cy": 10.5, "rx": 3.5, "ry": 2.5, "color": "liquidLight" },
+    { "id": "cork", "type": "rect", "x": 6, "y": 0, "w": 4, "h": 3, "color": "corkMid" },
+    { "id": "corkTop", "type": "rect", "x": 6, "y": 0, "w": 4, "h": 1, "color": "corkDark" }
+  ],
+  "pixels": {
+    "6,7": "glint", "6,8": "glint", "6,9": "glint", "7,10": "glint",
+    "12,10": "glassDark", "12,11": "glassDark", "13,9": "glassDark"
+  }
+}
