@@ -54,6 +54,17 @@ The painter's algorithm decides what is visible. Order matters:
 - Outline thickness is 1px. Shallow diagonal contour edges can paint 2px bands — check the silhouette for uneven thickness and adjust the contour points.
 - A tapered tip (tail, horn) naturally loses its interior to the outline — that is correct; the taper reads as a point.
 
+## Craft rules — what makes it look good, not just correct
+
+Correctness is the floor; craft is the ceiling. These rules come from human pixel-art practice and are checkable:
+
+1. **Hue-shifted shading** — shadows shift toward blue/purple, highlights shift toward yellow. Never shade by making the base hue darker or lighter only — a pure-darker shadow looks flat and muddy. Shadow = base hue + blue/purple; highlight = base hue + yellow.
+2. **Outline color** — the outline is the darkest shade of the object's hue family, not pure black. Pure black outlines flatten the piece. Near-black (#1A1A1A) is reserved for tiny details (eyes, seams) where hue is invisible at 1px.
+3. **Value compression** — 3–4 value steps per material: outline (darkest) + shadow + mid + light. Fewer steps at 16×16, more at 64×64+. If a material needs 5+ steps, merge two.
+4. **Silhouette readability** — the subject must be identifiable from the outline alone at native resolution. Render the outline layer by itself and check.
+5. **Detail economy** — 1–2 pixel overrides at 16×16, 2–4 at 32×32, 4–8 at 64×64. Every override must earn its pixel: eye, glint, seam. More than that is noise.
+6. **Light-source consistency** — upper-left lighting: light on top/left edges, shadow on bottom/right. The light layer's bbox sits above-left of the shade layer's bbox.
+
 ## Construction pipeline
 
 silhouette → major forms → internal structure → palette → shading → highlights → details → cleanup
@@ -61,7 +72,7 @@ silhouette → major forms → internal structure → palette → shading → hi
 1. **Silhouette** — the contour-first procedure above (organic) or the rect/ellipse composition (rectilinear).
 2. **Major forms** — the big interior regions, back to front (painter's algorithm).
 3. **Internal structure** — sub-forms inside the major regions (windows, blades, faces, liquid).
-4. **Palette** — assign the planned named keys (5–12 colors, no dead keys). Editing a palette key's hex recolors every pixel using that key — the engine-native way to replace a color.
+4. **Palette** — assign the planned named keys (5–12 colors, no dead keys), per the craft rules: hue-shifted shadow/highlight, hue-family outline, 3–4 value steps. Editing a palette key's hex recolors every pixel using that key — the engine-native way to replace a color.
 5. **Shading** — dark/mid/light per material; upper-left lighting.
 6. **Highlights** — sparse bright pixels on lit edges.
 7. **Details** — sparse pixel overrides for the last 5% (glints, crosses, stars, seams).

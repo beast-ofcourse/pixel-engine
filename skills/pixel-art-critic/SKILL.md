@@ -58,6 +58,19 @@ Check every category:
 - **COMPOSITION** — placement, 1–2px margins, balance, layering order.
 - **STYLE** — coherence with the asset set: material families, construction system.
 
+## Craft pass (provable aesthetic criteria)
+
+Aesthetic criteria that are still **provable from the document** — check them and report PASS/FAIL like facts, with the evidence:
+
+- **Value structure** — per material, 3–4 value steps (outline + shadow + mid + light). Provable: count distinct palette keys per material family.
+- **Hue shifting** — shadows shift toward blue/purple, highlights toward yellow; no material shades by pure darkening/lightening of the base hue. Provable: compare palette hexes within a material family (e.g. shadow `#3A5A4E` vs mid `#5E8F4E`: blue channel holds while green drops).
+- **Outline color** — outline is the darkest shade of the object's hue family, not pure black (near-black allowed only for tiny details). Provable: palette hex of the outline key.
+- **Silhouette readability** — the subject is identifiable from the outline layer alone at native resolution. Provable: render the outline layer in isolation and read the region.
+- **Detail economy** — override count matches the scale (1–2 at 16×16, 2–4 at 32×32, 4–8 at 64×64). Provable: count entries in the `pixels` map.
+- **Light consistency** — light layer bbox is **above** the shade layer bbox (top edge lit; shadow on bottom/right; the left edge may be a light underside like a belly). Provable: layer bboxes from `inspect()`.
+
+A craft-pass FAIL is a HIGH defect (palette/lighting class) — fix before acceptance, but it is not a blocking FACT FAIL.
+
 ## Severity
 
 - **CRITICAL** — structural breakage: silhouette merges, missing parts, wrong bounding box or margins. Must fix before acceptance.
