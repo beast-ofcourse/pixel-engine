@@ -259,7 +259,6 @@ prototype.html           browser sandbox
 scenes/                  experiment scenes (64×64 house/campfire, 128×128 house128/robot, 256×256 landscape, 10-asset benchmark ladder)
 docs/experiments/        per-asset experiment records for the benchmark ladder
 docs/FINDINGS.md         experiment log, failures, research answers
-skills/                  installable agent skills (pixel-art-generation, pixel-art-animation)
 animations/ball.json     16×16, 4-frame bounce (8 fps, keyframe-0)
 out/                     generated PNGs, previews, screenshots (incl. out/benchmark/)
 ```
@@ -274,8 +273,7 @@ pixel-exact (including a 2× upscale of the house), the animation subsystem
 preview, spritesheet export) is implemented and hash-locked, and the
 **10-asset benchmark ladder** (coin, potion, sword, axe, chest, torch, sword,
 axe, dragon, knight — 16×16 → 64×64) is authored, coherence-reviewed, and
-hash-locked. The authoring workflow is packaged as installable agent skills
-(`skills/pixel-art-generation`, `skills/pixel-art-animation`).
+hash-locked.
 
 Documented next experiments (in `docs/FINDINGS.md` and `docs/plans/tasks.md`):
 
