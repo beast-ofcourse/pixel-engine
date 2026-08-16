@@ -230,10 +230,10 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 
 Each release: suite green (127 + new tests), hash-locks for new assets, `references/api.md` + skills updated, npm publish + tag + gh release.
 
-## Open decisions (flag before implementation)
+## Decisions (resolved)
 
-1. **Pure-JS inflate scope** (2.3): Node zlib + browser canvas first, or full pure-JS inflate in v1? (Effort difference: ~1 day.)
-2. **`poly_subtract` algorithm** (1.8): Weiler–Atherton for general polygons vs convex-only Sutherland–Hodgman first?
-3. **GIF transparency** (2.2): 1-bit transparency via GCE, or opaque-only v1?
-4. **MCP package location** (4.1): in-repo `mcp/` subpackage vs separate repo?
-5. **`compare_scene_to_reference` size mismatch** (5.1): error vs auto-scale?
+1. **PNG import scope** (2.3): Node `zlib.inflateSync` + browser canvas. Pure-JS inflate is explicitly out of scope for v1.
+2. **`poly_subtract` algorithm** (1.8): Weiler–Atherton for general (concave) polygons, with a convex fast-path.
+3. **GIF transparency** (2.2): 1-bit transparency via GCE — transparent pixels stay transparent.
+4. **MCP package location** (4.1): in-repo `mcp/` subpackage with its own package.json.
+5. **`compare_scene_to_reference` size mismatch** (5.1): auto-scale the reference to the scene's size before comparing.
