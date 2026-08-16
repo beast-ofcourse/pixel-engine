@@ -314,3 +314,104 @@ out/landscape256.png|.html
 out/house-preview.png      browser screenshot (512×512)
 out/campfire-preview.png
 ```
+
+---
+
+## 8. Animation subsystem — milestone 1 (16×16, 2→4 frames)
+
+**Date:** 2026-08-16 · branch `animation-system` · suite 75 → 104 tests
+
+### What was built
+
+`engine/animation.js` — a zero-dependency animation layer on top of the
+existing engine. **No second pixel system**: every frame is an ordinary scene
+document, so rasterize/PNG/inspection all reuse the verified engine.
+
+- **Document**: `{ width, height, fps, palette, keyframes, frames[] }` where
+  each frame is `{ id, scene }`. Authoring model: **duplicate + modify** —
+  copy a frame, make localized changes; the diff between consecutive frames
+  *is* the motion.
+- **Ops**: `add_frame`, `duplicate_frame` (deep copy), `delete_frame`,
+  `set/get/clear_frame_pixel`, `fill_frame_region`, `move_frame_region`,
+  `copy_frame_region` — all delegate to the engine's scene ops.
+- **Exact diffing**: `diff_frames` returns changed/unchanged counts,
+  change percentage, bounding box, and the full per-pixel change list with
+  old/new values (hex or `null` for transparent). Deterministic row-major.
+- **Region validation**: `validate_change(anim, a, b, region)` → PASS/FAIL
+  with the exact unexpected-change list. The first 2-frame experiment:
+  a 2×2 sprite moved (1,1) on 16×16 → **7 changed pixels, bbox [2,2,3,3],
+  0 unexpected inside the covering region** — exactly the hand-computed
+  value (4 removed + 4 added − 1 overlapping pixel).
+- **Playback preview**: `animation_to_html` — self-contained page with
+  play/pause/restart/step/prev/next, fps control, keyframe badge, frame
+  indicator, click-to-inspect, PNG + spritesheet download.
+- **Spritesheet**: `encode_spritesheet` — export-only PNG (frames laid out
+  left-to-right); never the internal representation.
+- **Keyframes**: simple boolean markers (frame-0 of ball.json), no behavior
+  — stable reference points for the agent.
+- **CLI**: `node cli.js anim <file> [--diff a,b] [--validate a,b,x,y,w,h]
+  [--ascii id] [--sheet out.png] [--html out.html] [--fps n]`.
+
+### First artifact: `animations/ball.json`
+
+16×16, 4 frames, 8 fps, frame-0 keyframe. A ball bounces vertically
+(cy 5 → 7 → 9 → 7); each frame is the previous one with the ball/highlight
+ellipse `cy` changed — the duplicate+modify pattern visible in the JSON
+(frames 1–3 are 4-layer scenes identical to frame-0 except the two cy
+values). Shadow stays fixed. Per-frame hashes locked in the suite;
+frame-3 ≡ frame-1 (the bounce cycle closes). Consecutive diffs are exactly
+**30 changed pixels, 11.72%, bbox over the ball column**; frame-0→frame-2
+is 50 pixels, and `validate_change` with the ball column [5,2,7,11] passes
+with 0 unexpected.
+
+### Bug found (fix locked by tests)
+
+**Frame scenes resolve colors against their own `scene.palette`** — the
+engine's `resolveColor` never sees the animation-level palette. Writing
+pixels with palette keys (`set_frame_pixel(..., 'ball')`) silently rendered
+transparent when the frame scene's palette lacked the key. Fixed by seeding
+each frame scene's palette from `anim.palette` at every frame-scene access
+(`add_frame`, `normalize_animation`, and a `frameScene` helper used by all
+frame ops), so palette-set-after-add ordering also works. Regression test
+locked: `add_frame: animation palette seeds the frame scene`.
+
+### Preview bug found in browser verification
+
+`animation_to_html` drew the canvas immediately on load, before the
+embedded frame images had loaded — black canvas until a transport click.
+Fixed with per-image `onload` handlers that redraw the current frame.
+Verified in a real browser (playwright): canvas samples match Node
+`resolve_frame` pixel-for-pixel for frames 0 and 1, next/play/pause/restart
+all advance/loop/reset correctly, keyframe badge and fps input correct.
+
+### Measured experiment numbers
+
+| Metric | Value |
+|---|---|
+| 2-frame move experiment (2×2 sprite, +1,+1 on 16×16) | 7 changed / 249 unchanged / 2.73% / bbox [2,2,3,3] |
+| ball.json consecutive frames | 30 changed / 11.72% / bbox [5,2,6,8] |
+| ball.json frame-0 → frame-2 | 50 changed / 19.53% / bbox [5,2,6,10] |
+| validate (ball column) | PASS, 0 unexpected |
+| validate (too narrow) | FAIL, 41 unexpected |
+| spritesheet (4×16×16) | 64×16 PNG, 328 bytes, hash-locked |
+| suite | 104/104 |
+
+### What was deliberately NOT built (per §19 scope)
+
+Skeletal animation, interpolation, Bézier curves, timeline editors, WebGL,
+vision/AI image generation, auto-inbetweening, frame-delta storage
+compression, asset databases, project management, framework abstractions.
+Frames are complete scenes; deltas are computed on demand. This is the
+smallest API that supports the milestone-1 workflow.
+
+### Next animation milestones
+
+2. **4 → 8 → 12 → 24 frames** with multiple motions; measure diff accuracy
+   and validation catch-rate (how many unintended changes the region check
+   catches vs. how many the agent makes).
+3. **Layered motion**: separate layers moving independently (walk cycles,
+   parallax) — layer-level diffs as a debug tool.
+4. **Palette mutation metric**: count new colors appearing mid-animation;
+   enforce palette consistency across frames via `palette_drift`.
+5. Revisit frame **delta storage** only if 24-frame files get too large for
+   the agent's context budget.

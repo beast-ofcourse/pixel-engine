@@ -567,23 +567,21 @@
     return joinBytes([new Uint8Array([0x78, 0x01]), deflateFixed(raw), adler]);
   }
 
-  /** encode_png(scene) -> Uint8Array of PNG bytes. */
-  function encode_png(scene) {
-    const size = scene.size;
-    const rgba = rasterize(scene);
+  /** encode_png_buffer(rgba, width, height) -> Uint8Array of PNG bytes for an arbitrary RGBA buffer. */
+  function encode_png_buffer(rgba, width, height) {
     const ihdr = new Uint8Array(13);
     const dv = new DataView(ihdr.buffer);
-    dv.setUint32(0, size);
-    dv.setUint32(4, size);
+    dv.setUint32(0, width);
+    dv.setUint32(4, height);
     ihdr[8] = 8;  // bit depth
     ihdr[9] = 6;  // color type RGBA
     ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
 
-    const stride = size * 4 + 1;
-    const raw = new Uint8Array(stride * size);
-    for (let y = 0; y < size; y++) {
+    const stride = width * 4 + 1;
+    const raw = new Uint8Array(stride * height);
+    for (let y = 0; y < height; y++) {
       raw[y * stride] = 0; // filter: none
-      raw.set(rgba.subarray(y * size * 4, (y + 1) * size * 4), y * stride + 1);
+      raw.set(rgba.subarray(y * width * 4, (y + 1) * width * 4), y * stride + 1);
     }
 
     return joinBytes([
@@ -592,6 +590,12 @@
       chunk('IDAT', deflateStream(raw)),
       chunk('IEND', new Uint8Array(0))
     ]);
+  }
+
+  /** encode_png(scene) -> Uint8Array of PNG bytes. */
+  function encode_png(scene) {
+    const size = scene.size;
+    return encode_png_buffer(rasterize(scene), size, size);
   }
 
   // --------------------------------------------------------------------------
@@ -690,6 +694,7 @@
     read_region: read_region,
     // export
     encode_png: encode_png,
+    encode_png_buffer: encode_png_buffer,
     export_png: export_png,
     scene_to_html: scene_to_html
   };

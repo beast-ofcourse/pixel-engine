@@ -1,0 +1,71 @@
+{
+  "width": 16,
+  "height": 16,
+  "fps": 8,
+  "background": null,
+  "palette": {
+    "bg": "#1A1A2E",
+    "ball": "#E94560",
+    "highlight": "#F5E6CA",
+    "shadow": "#0F0F1E"
+  },
+  "keyframes": { "frame-0": true },
+  "frames": [
+    {
+      "id": "frame-0",
+      "scene": {
+        "size": 16,
+        "palette": { "bg": "#1A1A2E", "ball": "#E94560", "highlight": "#F5E6CA", "shadow": "#0F0F1E" },
+        "layers": [
+          { "id": "bg", "type": "fill", "color": "bg" },
+          { "id": "shadow", "type": "ellipse", "cx": 8, "cy": 13, "rx": 3, "ry": 1, "color": "shadow" },
+          { "id": "ball", "type": "ellipse", "cx": 8, "cy": 5, "rx": 3, "ry": 3, "color": "ball" },
+          { "id": "highlight", "type": "ellipse", "cx": 9, "cy": 4, "rx": 1, "ry": 1, "color": "highlight" }
+        ],
+        "pixels": {}
+      }
+    },
+    {
+      "id": "frame-1",
+      "scene": {
+        "size": 16,
+        "palette": { "bg": "#1A1A2E", "ball": "#E94560", "highlight": "#F5E6CA", "shadow": "#0F0F1E" },
+        "layers": [
+          { "id": "bg", "type": "fill", "color": "bg" },
+          { "id": "shadow", "type": "ellipse", "cx": 8, "cy": 13, "rx": 3, "ry": 1, "color": "shadow" },
+          { "id": "ball", "type": "ellipse", "cx": 8, "cy": 7, "rx": 3, "ry": 3, "color": "ball" },
+          { "id": "highlight", "type": "ellipse", "cx": 9, "cy": 6, "rx": 1, "ry": 1, "color": "highlight" }
+        ],
+        "pixels": {}
+      }
+    },
+    {
+      "id": "frame-2",
+      "scene": {
+        "size": 16,
+        "palette": { "bg": "#1A1A2E", "ball": "#E94560", "highlight": "#F5E6CA", "shadow": "#0F0F1E" },
+        "layers": [
+          { "id": "bg", "type": "fill", "color": "bg" },
+          { "id": "shadow", "type": "ellipse", "cx": 8, "cy": 13, "rx": 3, "ry": 1, "color": "shadow" },
+          { "id": "ball", "type": "ellipse", "cx": 8, "cy": 9, "rx": 3, "ry": 3, "color": "ball" },
+          { "id": "highlight", "type": "ellipse", "cx": 9, "cy": 8, "rx": 1, "ry": 1, "color": "highlight" }
+        ],
+        "pixels": {}
+      }
+    },
+    {
+      "id": "frame-3",
+      "scene": {
+        "size": 16,
+        "palette": { "bg": "#1A1A2E", "ball": "#E94560", "highlight": "#F5E6CA", "shadow": "#0F0F1E" },
+        "layers": [
+          { "id": "bg", "type": "fill", "color": "bg" },
+          { "id": "shadow", "type": "ellipse", "cx": 8, "cy": 13, "rx": 3, "ry": 1, "color": "shadow" },
+          { "id": "ball", "type": "ellipse", "cx": 8, "cy": 7, "rx": 3, "ry": 3, "color": "ball" },
+          { "id": "highlight", "type": "ellipse", "cx": 9, "cy": 6, "rx": 1, "ry": 1, "color": "highlight" }
+        ],
+        "pixels": {}
+      }
+    }
+  ]
+}

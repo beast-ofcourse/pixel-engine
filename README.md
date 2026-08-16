@@ -23,6 +23,12 @@ Five scenes were authored and verified with this loop (see [docs/FINDINGS.md](do
 All five were verified pixel-exact in a real browser (canvas-sample SHA-256
 == Node rasterize hash, 0 diffs) and are hash-locked by the test suite.
 
+**Animation** — the same scene documents become frames. `animations/ball.json`
+is a 16×16, 4-frame bounce (8 fps, frame-0 keyframe) built by duplicating a
+frame and moving the ball layer; consecutive-frame diffs are exactly 30
+pixels. Play it in a browser: `out/ball.html` (play/pause/restart/step,
+fps control, click-to-inspect, spritesheet export).
+
 ## How it works
 
 ```
@@ -32,6 +38,13 @@ engine/pixel-engine.js      ← rasterizer + tools + PNG encoder (zero deps)
     ↓
 cli.js                      ← render → inspect → zoom loop
 out/<name>.png / .html      ← exports + interactive preview
+
+animations/<name>.json      ← frames = scene documents + fps + keyframes
+    ↓
+engine/animation.js         ← frame ops, exact diffing, validation, spritesheets
+    ↓
+cli.js anim ...             ← diff → validate → export loop
+out/<name>.html / -sheet.png
 ```
 
 A scene document is plain JSON:
@@ -104,17 +117,58 @@ node cli.js scenes/house.json --zoom 19,28,26,21
 node serve.js
 # then open http://localhost:8734
 
-# Run the accuracy suite (75 tests: primitives, edge cases, PNG, hashes, CLI)
+# Run the accuracy suite (104 tests: primitives, edge cases, PNG, hashes, CLI, animation)
 node tests/test-suite.js
 ```
 
 The CLI prints color stats (count + bounding box per color), a full-canvas ASCII preview (auto-scaled to ≤40 chars wide to keep context small), and optionally a full-resolution zoom region or per-color counts for a region.
+
+## Animation
+
+An animation document is plain JSON: `width`, `height`, `fps`, `palette`,
+`keyframes`, and `frames` — each frame is an ordinary scene document. The
+authoring model is **duplicate + modify**: copy a frame, make localized
+changes, and the diff between consecutive frames *is* the motion.
+
+```json
+{
+  "width": 16, "height": 16, "fps": 8,
+  "palette": { "bg": "#1A1A2E", "ball": "#E94560" },
+  "keyframes": { "frame-0": true },
+  "frames": [
+    { "id": "frame-0", "scene": { "size": 16, "palette": { "bg": "#1A1A2E", "ball": "#E94560" },
+        "layers": [ { "id": "bg", "type": "fill", "color": "bg" },
+                    { "id": "ball", "type": "ellipse", "cx": 8, "cy": 5, "rx": 3, "ry": 3, "color": "ball" } ],
+        "pixels": {} } },
+    { "id": "frame-1", "scene": { "size": 16, "palette": { "bg": "#1A1A2E", "ball": "#E94560" },
+        "layers": [ { "id": "bg", "type": "fill", "color": "bg" },
+                    { "id": "ball", "type": "ellipse", "cx": 8, "cy": 7, "rx": 3, "ry": 3, "color": "ball" } ],
+        "pixels": {} } }
+  ]
+}
+```
+
+The agent's loop: `diff_frames` reports exactly which pixels changed (count,
+percentage, bounding box, per-pixel old/new values); `validate_change` checks
+the change against an allowed region (PASS/FAIL with the unexpected list);
+`animation_to_html` gives a playable preview; `encode_spritesheet` exports a
+PNG sheet (an export format only — never the internal representation).
+
+```bash
+# Diff two frames, validate a change region, preview a frame, export
+node cli.js anim animations/ball.json --diff frame-0,frame-1
+node cli.js anim animations/ball.json --validate frame-0,frame-2,5,2,7,11
+node cli.js anim animations/ball.json --ascii frame-0
+node cli.js anim animations/ball.json --sheet out/ball-sheet.png --html out/ball.html
+```
 
 ## CLI reference
 
 ```
 node cli.js <scene.json> [--png out.png] [--html out.html]
                         [--zoom x,y,w,h] [--counts x,y,w,h] [--scale n]
+node cli.js anim <anim.json> [--diff a,b] [--validate a,b,x,y,w,h]
+                             [--ascii frameId] [--sheet out.png] [--html out.html] [--fps n]
 ```
 
 | Flag | Purpose |
@@ -140,32 +194,55 @@ node cli.js <scene.json> [--png out.png] [--html out.html]
 | `inspect(scene)` | Per-color counts + bounding boxes |
 | `render(scene)` | RGBA pixel buffer |
 | `encode_png(scene)` / `export_png(scene, path)` | PNG bytes / file |
+| `encode_png_buffer(rgba, w, h)` | PNG bytes for an arbitrary RGBA buffer (spritesheets) |
 | `scene_to_html(scene, opts)` | Interactive preview HTML |
+
+`engine/animation.js` (load after pixel-engine; attaches to the same object):
+
+| Function | Purpose |
+|---|---|
+| `create_animation(w, h, opts)` / `normalize_animation(anim)` | New / loaded animation document |
+| `add_frame(anim, scene?)` / `duplicate_frame(anim, id)` / `delete_frame` | Frame lifecycle (duplicate = deep copy) |
+| `resolve_frame(anim, id)` | RGBA buffer of a frame |
+| `set_frame_pixel` / `get_frame_pixel` / `clear_frame_pixel` / `fill_frame_region` | Frame pixel ops (delegate to the engine) |
+| `move_frame_region` / `copy_frame_region` | Region moves/copies between frames |
+| `set_keyframe` / `is_keyframe` | Keyframe markers |
+| `diff_frames(anim, a, b)` | Exact diff: changed/unchanged counts, %, bbox, per-pixel changes |
+| `validate_change(anim, a, b, region)` | PASS/FAIL against an allowed region + unexpected list |
+| `frame_palette` / `palette_drift` | Resolved color usage / palette consistency |
+| `encode_spritesheet(anim, opts)` / `export_spritesheet` | PNG sheet (export only) |
+| `animation_to_html(anim, opts)` | Self-contained playback preview |
 
 ## Project structure
 
 ```
 engine/pixel-engine.js   engine + tools (~700 lines, zero deps)
-tests/test-suite.js      75-test accuracy suite (node tests/test-suite.js)
-cli.js                   render/inspect/zoom/export driver
+engine/animation.js      animation subsystem: frames, exact diffing, validation, spritesheets
+tests/test-suite.js      104-test accuracy suite (node tests/test-suite.js)
+cli.js                   render/inspect/zoom/export driver + anim subcommand
 serve.js                 zero-dependency static server for the sandbox
 prototype.html           browser sandbox
 scenes/                  experiment scenes (64×64 house/campfire, 128×128 house128/robot, 256×256 landscape)
+animations/ball.json     16×16, 4-frame bounce (8 fps, keyframe-0)
 out/                     generated PNGs, previews, screenshots
 docs/FINDINGS.md         experiment log, failures, research answers
 ```
 
 ## Status and next steps
 
-The 64×64 baseline is validated and **hash-locked by a 75-test accuracy
+The 64×64 baseline is validated and **hash-locked by a 104-test accuracy
 suite** — any engine change that moves a single pixel fails the run. The
 representation also scales: 128×128 and 256×256 scenes were authored and
-verified pixel-exact (including a 2× upscale of the house). Documented next
+verified pixel-exact (including a 2× upscale of the house), and the animation
+subsystem (milestone 1: 16×16, 2→4 frames, exact diffing, region validation,
+playback preview, spritesheet export) is implemented and hash-locked, with
+the first 2-frame experiment verified in a browser. Documented next
 experiments (in `docs/FINDINGS.md`):
 
 1. Stress the repair loop: deliberately flawed scenes, measure render→inspect→fix cycles
 2. Package the workflow as an installable agent skill (`pixel-art-generation`)
 3. Optionally expose the tool API as MCP tools
+4. Animation milestones: 8/12/24-frame scenes, layered motion, walk cycles
 
 ## Known limitations
 
@@ -173,3 +250,8 @@ experiments (in `docs/FINDINGS.md`):
 - PNG encoder uses a hand-rolled fixed-Huffman DEFLATE (RFC 1951) — byte-valid
   (round-trip verified against zlib), but not the most compact compression
 - ASCII inspection is the agent's primary "eyes" — pixel probes and `inspect()` stats are more reliable than eyeballing ASCII rows (see FINDINGS §5)
+- Animation frames are complete scenes (deltas are computed, not stored);
+  `move_frame_region`/`clear_frame_pixel` erase by revealing the layers
+  beneath — to erase over a filled background, fill the region with the
+  background color instead
+- Frames are square like scenes (the engine rasterizes square canvases)
