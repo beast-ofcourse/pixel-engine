@@ -1,11 +1,11 @@
 ---
 name: pixel-engine
-description: Technical reference for operating the pixel-engine. Use when working with the engine's internals, scene or animation document formats, API functions, coordinate system, colors, regions, frames, spritesheets, PNG export, rendering behavior, or known limitations and failure modes. Not an art skill — for art decisions use pixel-art-planner, pixel-art-builder, and pixel-art-critic.
+description: Technical reference for operating the pixel-engine. Use when working with the engine's internals, scene or animation document formats, API functions, coordinate system, colors, regions, frames, spritesheets, PNG export, rendering behavior, or known limitations and failure modes. Not an art skill — for art decisions use pixel-art-planner, pixel-art-builder, and pixel-art-critic; for animation work use pixel-animation.
 ---
 
 # pixel-engine
 
-"How do I operate this machine?" — the technical reference. Art decisions belong to the planner, builder, and critic skills; this skill is about the machine itself.
+"How do I operate this machine?" — the technical reference. Art decisions belong to the planner, builder, and critic skills; animation work belongs to pixel-animation. This skill is about the machine itself.
 
 ## Engine architecture
 

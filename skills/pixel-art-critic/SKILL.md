@@ -65,6 +65,8 @@ Check every category:
 - **MEDIUM** — shading or highlight issues, cluster quality, detail placement.
 - **LOW** — polish: isolated pixels, minor detail nits.
 
+Any **FACT FAIL is blocking** — a failed provable check must be fixed before acceptance, regardless of aesthetic severity.
+
 ## Output format
 
 ```

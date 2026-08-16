@@ -60,7 +60,8 @@ Write the plan as a compact markdown block with these nine sections, in order:
 
 ### 9. Construction order
 
-- The exact layer sequence the builder will emit: outline → back forms → mid forms → front forms → shading → highlights → detail overrides.
+- The exact sequence the builder will execute: silhouette → major forms → internal structure → palette → shading → highlights → details → cleanup.
+- Layer emission order (painter's algorithm, back to front): outline → back forms → mid forms → front forms → shading → highlights → detail overrides.
 
 ## Completion criteria
 
