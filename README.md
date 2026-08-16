@@ -1,5 +1,13 @@
 # pixel-engine
 
+[![npm version](https://img.shields.io/npm/v/pixel-engine-zero?color=4a7a3a)](https://www.npmjs.com/package/pixel-engine-zero)
+[![npm downloads](https://img.shields.io/npm/dm/pixel-engine-zero)](https://www.npmjs.com/package/pixel-engine-zero)
+[![npm total downloads](https://img.shields.io/npm/dt/pixel-engine-zero)](https://www.npmjs.com/package/pixel-engine-zero)
+[![license MIT](https://img.shields.io/npm/l/pixel-engine-zero)](https://github.com/beast-ofcourse/pixel-engine/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/beast-ofcourse/pixel-engine)](https://github.com/beast-ofcourse/pixel-engine)
+[![bundle size](https://img.shields.io/bundlephobia/min/pixel-engine-zero)](https://bundlephobia.com/package/pixel-engine-zero)
+[![node >= 14](https://img.shields.io/badge/node-%3E%3D14-339933)](https://nodejs.org)
+
 **A coding LLM constructs 64×64 pixel art from a structured scene document — layers, palette, and sparse pixel overrides — instead of emitting pixels one by one.**
 
 This is an **experimental research prototype**, not a product. The question it exists to answer:
