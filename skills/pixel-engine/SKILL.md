@@ -1,11 +1,33 @@
 ---
 name: pixel-engine
-description: Technical reference for operating the pixel-engine. Use when working with the engine's internals, scene or animation document formats, API functions, coordinate system, colors, regions, frames, spritesheets, PNG export, rendering behavior, or known limitations and failure modes. Not an art skill — for art decisions use pixel-art-planner, pixel-art-builder, and pixel-art-critic; for animation work use pixel-animation.
+description: Technical reference for operating the pixel-engine and orchestrator of the pixel-art workflow. Use when working with the engine's internals, scene or animation document formats, API functions, coordinate system, colors, regions, frames, spritesheets, PNG export, rendering behavior, known limitations and failure modes, or when running the plan → build → review → accept workflow. Not an art skill — for art decisions use pixel-art-planner, pixel-art-builder, and pixel-art-critic; for animation work use pixel-animation.
 ---
 
 # pixel-engine
 
-"How do I operate this machine?" — the technical reference. Art decisions belong to the planner, builder, and critic skills; animation work belongs to pixel-animation. This skill is about the machine itself.
+"How do I operate this machine?" — the technical reference and the workflow orchestrator. Art decisions belong to the planner, builder, and critic skills; animation work belongs to pixel-animation. This skill is about the machine itself and the order in which the other skills operate it.
+
+## Workflow — making pixel art with the skills
+
+The skills are a **pipeline, not a menu**. Load them in sequence; each one owns one phase. This skill (the engine reference) is consulted throughout for document formats, API signatures, and failure modes — never call engine functions from memory.
+
+### The sequence
+
+1. **Plan** — load `pixel-art-planner`. Decide the subject, size (16 → 32 → 64 ladder), palette direction, and construction approach BEFORE any pixels. The plan is the contract.
+2. **Build** — load `pixel-art-builder`. Construct the scene document: contour-first for organic forms, primitive selection, layer ordering, and the craft rules (hue-shifted shading, hue-family outline, value compression, silhouette readability, detail economy, light consistency). Iterate with the render → inspect → fix loop until the asset is clean.
+3. **Review** — load `pixel-art-critic`. Run the validation FACT checks, the critique categories, and the craft pass. The critic produces correction instructions; it never edits the artwork.
+4. **Fix** — if the critic found defects, return to the builder (step 2) with the correction instructions. Repeat until the critic passes.
+5. **Accept + record** — the asset is done when the critic reports no blocking FACT FAILs and no CRITICAL/HIGH defects. Write the experiment record in `docs/experiments/` (iterations, palette usage, final assessment) — the repo convention.
+
+### Rules
+
+- **One skill at a time, in order.** Do not skip the planner for "simple" assets — the plan is what makes the build deterministic. Do not skip the critic — blind self-grading is the failure mode the critic exists to prevent.
+- **The critic never grades its own construction.** If you built the asset, hand it to a fresh critic pass (or another agent). Never review your own work in the same pass.
+- **The render → inspect → fix loop is the build.** After each construction phase: `read_region` preview → `inspect` stats → `read_region` zoom on problem areas → diagnose → fix surgically → re-render. Verify before concluding: silhouette bbox within 1–2px margins, every palette key painted, zero unexpected mutations, all junctions connected.
+- **Craft rules are part of the build, not the review.** The builder applies them; the critic verifies them in the craft pass.
+- **Animation is a separate pipeline.** To animate an accepted asset, load `pixel-animation` (principles + engine workflow): keyframe → duplicate → modify → diff → validate. The accepted asset is the keyframe; never redraw frames from scratch.
+- **The engine skill is the reference, not the artist.** Consult it for the machine; art decisions belong to the planner/builder/critic.
+- **Stop when the critic passes.** Do not keep polishing an accepted asset — diminishing returns. Record it and move on.
 
 ## Engine architecture
 
