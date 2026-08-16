@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pixel Engine — prototype sandbox</title>
+<style>
+  body { font-family: ui-monospace, Consolas, monospace; background: #111; color: #ddd; margin: 24px; }
+  h1 { font-size: 16px; color: #888; font-weight: 400; }
+  .row { display: flex; gap: 24px; flex-wrap: wrap; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges;
+           border: 1px solid #333; cursor: crosshair;
+           background: repeating-conic-gradient(#2a2a2a 0 25%, #222 0 50%) 0 0/16px 16px; }
+  textarea { width: 460px; height: 640px; background: #0c0c0c; color: #9f9; border: 1px solid #2a2a2a;
+             font-family: ui-monospace, Consolas, monospace; font-size: 11px; padding: 8px; }
+  pre { background: #0c0c0c; border: 1px solid #2a2a2a; padding: 12px; font-size: 11px;
+        line-height: 1.15; overflow: auto; white-space: pre; max-height: 400px; }
+  button { background: #222; color: #ddd; border: 1px solid #444; padding: 6px 14px; cursor: pointer; margin-right: 6px; }
+  table { border-collapse: collapse; font-size: 12px; }
+  td, th { border: 1px solid #2a2a2a; padding: 2px 8px; text-align: left; }
+  .chip { display: inline-block; width: 10px; height: 10px; border: 1px solid #444; margin-right: 4px; vertical-align: middle; }
+  #info { font-size: 12px; margin: 8px 0; min-height: 16px; }
+</style>
+</head>
+<body>
+<h1>Pixel Engine — prototype sandbox (64×64)</h1>
+<div class="row">
+  <div>
+    <canvas id="cv" width="512" height="512"></canvas>
+    <div id="info">click canvas to inspect pixel (edit JSON → Render)</div>
+    <button onclick="doRender()">Render</button>
+    <button onclick="doExport()">Export PNG</button>
+    <button onclick="loadFile()">Load scene JSON…</button>
+    <input type="file" id="file" accept=".json" style="display:none">
+  </div>
+  <div>
+    <textarea id="src" spellcheck="false"></textarea>
+  </div>
+</div>
+<div class="row">
+  <div style="min-width:380px">
+    <h1 style="margin-top:16px">ASCII preview (auto-scaled)</h1>
+    <pre id="ascii"></pre>
+  </div>
+  <div style="min-width:380px">
+    <h1 style="margin-top:16px">Color stats</h1>
+    <table id="stats"></table>
+  </div>
+</div>
+<script src="engine/pixel-engine.js"></script>
+<script>
+  const PE = window.PixelEngine;
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  const DEFAULT_SCENE = {
+    "size": 64,
+    "palette": {
+      "sky": "#7EC8E3", "sun": "#FFD34E", "cloud": "#FFFFFF", "ground": "#6BBF59",
+      "wall": "#F2D8A7", "roof": "#C25B3A", "roofDark": "#8E3B22", "chimney": "#8E6B4A",
+      "door": "#6B4226", "window": "#9BD4F0", "dark": "#3A2315", "gold": "#E8C14E"
+    },
+    "layers": [
+      { "id": "sky", "type": "fill", "color": "sky" },
+      { "id": "sun", "type": "ellipse", "cx": 52, "cy": 10, "rx": 5, "ry": 5, "color": "sun" },
+      { "id": "cloud-a", "type": "ellipse", "cx": 14, "cy": 9, "rx": 7, "ry": 3, "color": "cloud" },
+      { "id": "cloud-b", "type": "ellipse", "cx": 21, "cy": 9, "rx": 6, "ry": 3, "color": "cloud" },
+      { "id": "cloud-c", "type": "ellipse", "cx": 9, "cy": 10, "rx": 5, "ry": 3, "color": "cloud" },
+      { "id": "ground", "type": "rect", "x": 0, "y": 50, "w": 64, "h": 14, "color": "ground" },
+      { "id": "chimney", "type": "rect", "x": 40, "y": 15, "w": 5, "h": 10, "color": "chimney" },
+      { "id": "chimney-outline", "type": "rectout", "x": 40, "y": 15, "w": 5, "h": 10, "color": "dark" },
+      { "id": "roof", "type": "poly", "points": [[13,28],[51,28],[32,11]], "color": "roof" },
+      { "id": "roof-outline", "type": "polyout", "points": [[13,28],[51,28],[32,11]], "color": "roofDark" },
+      { "id": "wall", "type": "rect", "x": 19, "y": 28, "w": 26, "h": 21, "color": "wall" },
+      { "id": "wall-outline", "type": "rectout", "x": 19, "y": 28, "w": 26, "h": 21, "color": "dark" },
+      { "id": "door", "type": "rect", "x": 28, "y": 38, "w": 8, "h": 11, "color": "door" },
+      { "id": "door-outline", "type": "rectout", "x": 28, "y": 38, "w": 8, "h": 11, "color": "dark" },
+      { "id": "window-l", "type": "rect", "x": 22, "y": 33, "w": 6, "h": 6, "color": "window" },
+      { "id": "window-l-frame", "type": "rectout", "x": 22, "y": 33, "w": 6, "h": 6, "color": "dark" },
+      { "id": "window-r", "type": "rect", "x": 37, "y": 33, "w": 6, "h": 6, "color": "window" },
+      { "id": "window-r-frame", "type": "rectout", "x": 37, "y": 33, "w": 6, "h": 6, "color": "dark" }
+    ],
+    "pixels": {
+      "22,36": "dark", "23,36": "dark", "24,36": "dark", "25,36": "dark", "26,36": "dark", "27,36": "dark",
+      "25,33": "dark", "25,34": "dark", "25,35": "dark", "25,37": "dark", "25,38": "dark",
+      "37,36": "dark", "38,36": "dark", "39,36": "dark", "40,36": "dark", "41,36": "dark", "42,36": "dark",
+      "40,33": "dark", "40,34": "dark", "40,35": "dark", "40,37": "dark", "40,38": "dark",
+      "30,43": "gold"
+    }
+  };
+
+  document.getElementById('src').value = JSON.stringify(DEFAULT_SCENE, null, 2);
+
+  function currentScene() {
+    try { return JSON.parse(document.getElementById('src').value); }
+    catch (e) { alert('JSON error: ' + e.message); return null; }
+  }
+
+  function doRender() {
+    const scene = currentScene();
+    if (!scene) return;
+    const scale = 512 / scene.size;
+    ctx.clearRect(0, 0, 512, 512);
+    const img = new Image();
+    img.onload = () => { ctx.drawImage(img, 0, 0, 512, 512); };
+    img.src = 'data:image/png;base64,' + pngToB64(PE.encode_png(scene));
+    document.getElementById('ascii').textContent = PE.read_region(scene);
+    const stats = PE.inspect(scene);
+    document.getElementById('stats').innerHTML =
+      '<tr><th>name</th><th>color</th><th>pixels</th><th>bbox</th></tr>' +
+      stats.colors.map(c =>
+        '<tr><td>' + (c.name || '') + '</td><td><span class="chip" style="background:' + c.color + '"></span>' + c.color +
+        '</td><td>' + c.count + '</td><td>[' + c.bbox.join(', ') + ']</td></tr>').join('');
+  }
+
+  function pngToB64(bytes) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+
+  function doExport() {
+    const scene = currentScene();
+    if (!scene) return;
+    const a = document.createElement('a');
+    a.href = 'data:image/png;base64,' + pngToB64(PE.encode_png(scene));
+    a.download = 'scene.png';
+    a.click();
+  }
+
+  cv.addEventListener('click', (e) => {
+    const scene = currentScene();
+    if (!scene) return;
+    const r = cv.getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left) * scene.size / cv.width);
+    const y = Math.floor((e.clientY - r.top) * scene.size / cv.height);
+    const hex = PE.get_pixel(scene, x, y);
+    document.getElementById('info').textContent =
+      '(' + x + ',' + y + ') -> ' + (hex || 'transparent');
+  });
+
+  function loadFile() {
+    const f = document.getElementById('file');
+    f.onchange = () => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        document.getElementById('src').value = reader.result;
+        doRender();
+      };
+      reader.readAsText(f.files[0]);
+    };
+    f.click();
+  }
+
+  doRender();
+</script>
+</body>
+</html>
