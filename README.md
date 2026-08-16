@@ -8,6 +8,50 @@ This is an **experimental research prototype**, not a product. The question it e
 
 The engine is a single zero-dependency file that works in Node and the browser. It rasterizes a declarative scene document to a pixel buffer, renders it to PNG, and exposes inspection tools (ASCII previews, color stats, region zoom) so an agent can render → inspect → fix → re-render without ever reasoning about all 4,096 pixels at once.
 
+## How it works — in plain English
+
+A pixel-art image is just a grid of tiny colored squares. A 64×64 image has **4,096** of them. If the AI tried to decide each square one by one, it would drown — and the result would be a mess.
+
+So the engine flips the problem: **the AI writes a recipe, and the engine does the cooking.** The AI never touches individual pixels. It writes a short list of instructions — "draw a green blob here, a lighter belly here, a dark outline around the whole thing" — and the engine turns that recipe into the finished picture. The AI reasons about **15–20 shapes** instead of 4,096 pixels.
+
+### The recipe (a "scene document")
+
+Every picture starts as a small text file with three parts:
+
+1. **The canvas** — how big the picture is (16×16, 32×32, 64×64…).
+2. **The palette** — the paint colors, each given a name, like a paint-by-numbers kit. The AI says "paint this shape `skinMid`" — it never types a color code. Change one line and every pixel using that color updates.
+3. **The layers** — the actual instructions, in order. Each layer is one shape: "draw a polygon here in `skinMid`".
+
+### Layers = stacked glass sheets
+
+Imagine each layer is a **sheet of glass with paint on it**, stacked on top of each other. Anything painted on a higher sheet **covers** what's beneath it. That's why order matters: the lizard recipe draws the body, then the belly, then the shadow, then the legs (so the shadow can't swallow them), then the highlight, then the outline **last** — one thin line around the whole creature, on top of everything.
+
+### The shapes the engine knows
+
+Seven kinds of instructions, like a box of stencils:
+
+- **fill** — paint the whole canvas one color (the sky, the background)
+- **rect** — a solid rectangle (a chest, a building)
+- **rectout** — just the rectangle's outline (a window frame)
+- **ellipse** — a circle or oval (a coin, a potion)
+- **line** — a straight line
+- **poly** — any many-sided shape (the workhorse for organic things: creatures, flames, tails)
+- **polyout** — just the outline of a many-sided shape (the dark contour around a creature)
+
+The engine figures out exactly which squares each shape covers — including the tricky math of filling a weird polygon — and paints them. The AI just picks the right stencil.
+
+### The "eyes" — how the AI sees what it made
+
+The engine doesn't just draw; it gives the AI **eyes** to check its own work: a text preview of the whole picture, per-color pixel counts and positions, and a magnifying glass that zooms into any region at full resolution. Then the loop: **render → look → fix → render again**. The AI draws, spots a problem (the shadow covered the belly!), fixes one line of the recipe, and re-renders.
+
+### Animation — copy, tweak, repeat
+
+Animation uses the same recipe idea, even simpler. The AI draws one good frame (the "keyframe"), **copies** it, **moves one thing** in the copy, and checks the difference — the engine reports exactly which pixels changed. The difference between two frames **is** the motion. So animation becomes: copy → tweak → check → repeat.
+
+### Why this works
+
+Because the AI is never staring at 4,096 pixels. It's writing a recipe, checking the result through the engine's eyes, and fixing the recipe. The engine handles the pixel-level drudgery — filling polygons, stacking layers, counting colors, diffing frames — and the AI handles the judgment: what shape, what color, what order, what looks good.
+
 ## Showcase
 
 ### Benchmark asset set — the best work so far
@@ -63,7 +107,7 @@ moving the ball layer; consecutive-frame diffs are exactly 30 pixels. Play it
 in a browser: `out/ball.html` (play/pause/restart/step, fps control,
 click-to-inspect, spritesheet export).
 
-## How it works
+## How it works — technical details
 
 ```
 scenes/<name>.json          ← the agent's artifact: a structured scene document
