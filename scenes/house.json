@@ -1,0 +1,44 @@
+{
+  "size": 64,
+  "palette": {
+    "sky": "#7EC8E3",
+    "sun": "#FFD34E",
+    "cloud": "#FFFFFF",
+    "ground": "#6BBF59",
+    "wall": "#F2D8A7",
+    "roof": "#C25B3A",
+    "roofDark": "#8E3B22",
+    "chimney": "#8E6B4A",
+    "door": "#6B4226",
+    "window": "#9BD4F0",
+    "dark": "#3A2315",
+    "gold": "#E8C14E"
+  },
+  "layers": [
+    { "id": "sky", "type": "fill", "color": "sky" },
+    { "id": "sun", "type": "ellipse", "cx": 52, "cy": 10, "rx": 5, "ry": 5, "color": "sun" },
+    { "id": "cloud-a", "type": "ellipse", "cx": 14, "cy": 9, "rx": 7, "ry": 3, "color": "cloud" },
+    { "id": "cloud-b", "type": "ellipse", "cx": 21, "cy": 9, "rx": 6, "ry": 3, "color": "cloud" },
+    { "id": "cloud-c", "type": "ellipse", "cx": 9, "cy": 10, "rx": 5, "ry": 3, "color": "cloud" },
+    { "id": "ground", "type": "rect", "x": 0, "y": 50, "w": 64, "h": 14, "color": "ground" },
+    { "id": "chimney", "type": "rect", "x": 40, "y": 15, "w": 5, "h": 10, "color": "chimney" },
+    { "id": "chimney-outline", "type": "rectout", "x": 40, "y": 15, "w": 5, "h": 10, "color": "dark" },
+    { "id": "roof", "type": "poly", "points": [[13, 28], [51, 28], [32, 11]], "color": "roof" },
+    { "id": "roof-outline", "type": "polyout", "points": [[13, 28], [51, 28], [32, 11]], "color": "roofDark" },
+    { "id": "wall", "type": "rect", "x": 19, "y": 28, "w": 26, "h": 21, "color": "wall" },
+    { "id": "wall-outline", "type": "rectout", "x": 19, "y": 28, "w": 26, "h": 21, "color": "dark" },
+    { "id": "door", "type": "rect", "x": 28, "y": 38, "w": 8, "h": 11, "color": "door" },
+    { "id": "door-outline", "type": "rectout", "x": 28, "y": 38, "w": 8, "h": 11, "color": "dark" },
+    { "id": "window-l", "type": "rect", "x": 22, "y": 33, "w": 6, "h": 6, "color": "window" },
+    { "id": "window-l-frame", "type": "rectout", "x": 22, "y": 33, "w": 6, "h": 6, "color": "dark" },
+    { "id": "window-r", "type": "rect", "x": 37, "y": 33, "w": 6, "h": 6, "color": "window" },
+    { "id": "window-r-frame", "type": "rectout", "x": 37, "y": 33, "w": 6, "h": 6, "color": "dark" }
+  ],
+  "pixels": {
+    "22,36": "dark", "23,36": "dark", "24,36": "dark", "25,36": "dark", "26,36": "dark", "27,36": "dark",
+    "25,33": "dark", "25,34": "dark", "25,35": "dark", "25,37": "dark", "25,38": "dark",
+    "37,36": "dark", "38,36": "dark", "39,36": "dark", "40,36": "dark", "41,36": "dark", "42,36": "dark",
+    "40,33": "dark", "40,34": "dark", "40,35": "dark", "40,37": "dark", "40,38": "dark",
+    "30,43": "gold"
+  }
+}

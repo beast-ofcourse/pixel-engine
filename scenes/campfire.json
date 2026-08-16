@@ -1,0 +1,44 @@
+{
+  "size": 64,
+  "palette": {
+    "night": "#1B2A4A",
+    "moon": "#F5F0D0",
+    "star": "#FFFFFF",
+    "ground": "#2E1B0E",
+    "halo": "#E25822",
+    "outer": "#FF7A00",
+    "flame": "#FFB300",
+    "core": "#FFF3B0",
+    "logDark": "#3A2510",
+    "log": "#5A3A1E",
+    "stone": "#6B6B6B",
+    "stoneDark": "#4A4A4A",
+    "ember": "#FF5722"
+  },
+  "layers": [
+    { "id": "night", "type": "fill", "color": "night" },
+    { "id": "moon", "type": "ellipse", "cx": 10, "cy": 9, "rx": 4, "ry": 4, "color": "moon" },
+    { "id": "ground", "type": "rect", "x": 0, "y": 50, "w": 64, "h": 14, "color": "ground" },
+    { "id": "glow-halo", "type": "ellipse", "cx": 32, "cy": 41, "rx": 13, "ry": 11, "color": "halo" },
+    { "id": "flame-outer", "type": "poly", "points": [[32, 22], [40, 41], [32, 52], [24, 41]], "color": "outer" },
+    { "id": "flame-mid", "type": "poly", "points": [[32, 28], [37, 42], [32, 49], [27, 42]], "color": "flame" },
+    { "id": "flame-core", "type": "poly", "points": [[32, 33], [34, 42], [32, 46], [30, 42]], "color": "core" },
+    { "id": "log-a", "type": "poly", "points": [[16, 52], [36, 56], [36, 59], [16, 55]], "color": "logDark" },
+    { "id": "log-b", "type": "poly", "points": [[46, 52], [28, 56], [28, 59], [46, 55]], "color": "log" },
+    { "id": "stone-1", "type": "ellipse", "cx": 23, "cy": 51, "rx": 2, "ry": 2, "color": "stone" },
+    { "id": "stone-2", "type": "ellipse", "cx": 29, "cy": 54, "rx": 2, "ry": 2, "color": "stoneDark" },
+    { "id": "stone-3", "type": "ellipse", "cx": 36, "cy": 54, "rx": 2, "ry": 2, "color": "stone" },
+    { "id": "stone-4", "type": "ellipse", "cx": 42, "cy": 51, "rx": 2, "ry": 2, "color": "stoneDark" },
+    { "id": "stone-5", "type": "ellipse", "cx": 26, "cy": 48, "rx": 2, "ry": 1, "color": "stoneDark" },
+    { "id": "stone-6", "type": "ellipse", "cx": 38, "cy": 48, "rx": 2, "ry": 1, "color": "stone" }
+  ],
+  "pixels": {
+    "32,18": "ember", "31,16": "ember", "27,24": "ember", "38,22": "ember",
+    "24,27": "ember", "40,26": "ember", "30,20": "ember", "34,19": "ember",
+    "32,13": "ember",
+    "12,7": "star", "18,5": "star", "25,8": "star", "31,6": "star",
+    "38,5": "star", "44,9": "star", "50,6": "star", "55,10": "star",
+    "58,4": "star", "20,12": "star", "48,15": "star", "6,14": "star",
+    "10,11": "moon", "9,8": "moon"
+  }
+}
