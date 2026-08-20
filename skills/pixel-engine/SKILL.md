@@ -91,7 +91,7 @@ Full table in `references/api.md` — frame lifecycle, pixel ops, region ops, ke
 ## Rendering
 
 - `rasterize(scene)`: transparent buffer → layers painted in order (painter's algorithm) → `pixels` overrides applied last.
-- Layer types: `fill`, `rect`, `rectout` (thickness `t`), `ellipse` (pixel-center test), `line` (Bresenham), `poly` (scanline fill), `polyout` (edge lines).
+- Layer types: `fill`, `rect`, `rectout` (thickness `t`), `ellipse` (pixel-center test), `line` (Bresenham), `poly` (scanline fill), `polyout` (edge lines), `curve` (Catmull-Rom spline through `points`, filled; `closed: true` for a loop).
 - Rect scan range: `floor(x)..ceil(x+w)-1`, clamped to the canvas. Ellipse scan range: `floor(cx-rx)..ceil(cx+rx)` — the pixel-center test decides which pixels actually paint, so verify real bounds with `inspect()`.
 
 ## Limitations

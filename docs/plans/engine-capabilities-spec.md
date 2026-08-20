@@ -12,7 +12,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 
 ## Phase 1 — Primitives & geometry (pure additions, no dependencies)
 
-### 1.1 `mirror_region(scene, x, y, w, h, axis)`
+### 1.1 `mirror_region(scene, x, y, w, h, axis)` ✅
 
 - **Purpose**: symmetry for creatures/characters — build one side, mirror the other.
 - **API**: `axis` = `'h'` (mirror left↔right across the region's vertical centerline) | `'v'` (top↔bottom). Mutates the region in place on the resolved buffer, writing pixel overrides.
@@ -21,7 +21,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: 4×4 region mirrored h/v, odd width, clipping, determinism (rasterize twice → identical bytes).
 - **Effort**: S.
 
-### 1.2 `replace_color(scene, from, to)`
+### 1.2 `replace_color(scene, from, to)` ✅
 
 - **Purpose**: recolor by palette key or hex — document-level, survives re-render (unlike a buffer op).
 - **API**: `from`/`to` = palette key or hex. If `from` is a hex, remap every key whose hex equals it. Rewrites layer colors and pixel overrides; if `to` is a hex not in the palette, add it as a key.
@@ -29,7 +29,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: key→key, hex→key, key→new-hex (palette grows), no-op cases.
 - **Effort**: S.
 
-### 1.3 `flood_fill(scene, x, y, color, tolerance?)`
+### 1.3 `flood_fill(scene, x, y, color, tolerance?)` ✅
 
 - **Purpose**: enclosed-region touch-ups (fill a bounded area without knowing its polygon).
 - **API**: seed point, target color key/hex, optional `tolerance` (0 = exact match, default). Buffer-level: writes pixel overrides.
@@ -37,7 +37,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: enclosed region on transparent canvas, region on filled background, tolerance matching, no-op cases.
 - **Effort**: S.
 
-### 1.4 `curve` layer type
+### 1.4 `curve` layer type ✅
 
 - **Purpose**: smooth organic curves — the gap that forced polygon workarounds.
 - **API**: new layer type `{ "type": "curve", "points": [[x,y],...], "color": key, "closed": false }`. Rasterizer samples the curve (Catmull-Rom through the points) with the same pixel-center test as `ellipse`.
@@ -45,7 +45,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: open curve through 3–5 points, closed loop, degenerate inputs, hash-lock one curve asset.
 - **Effort**: M.
 
-### 1.5 `draw_cluster(scene, x, y, pattern, color)`
+### 1.5 `draw_cluster(scene, x, y, pattern, color)` ✅
 
 - **Purpose**: reusable pixel patterns (scales, feathers, leaves, stars) without per-pixel calls.
 - **API**: `pattern` = array of `[dx, dy]` offsets (or a small string grid, e.g. `["X.X", ".X."]`). Writes pixel overrides.
@@ -53,7 +53,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: offset pattern, string-grid pattern, clipping.
 - **Effort**: S.
 
-### 1.6 `move_region(scene, x, y, w, h, dx, dy)` / `copy_region(scene, x, y, w, h, dx, dy)`
+### 1.6 `move_region(scene, x, y, w, h, dx, dy)` / `copy_region(scene, x, y, w, h, dx, dy)` ✅
 
 - **Purpose**: scene-level parity with the frame-level region ops.
 - **API**: identical semantics to `move_frame_region` / `copy_frame_region` (buffer-level, override writes, erase-by-reveal; overlapping move clears sources before writing destinations).
@@ -61,7 +61,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: mirror the frame-region tests (move diff, copy across, overlap ordering).
 - **Effort**: S.
 
-### 1.7 `extract_outline(scene, region?)`
+### 1.7 `extract_outline(scene, region?)` ✅
 
 - **Purpose**: boundary pixels of the painted silhouette — feeds the critic's silhouette checks and outline painting.
 - **API**: returns `[{x, y}, ...]` — 4-connected boundary pixels (painted pixel adjacent to transparent/out-of-region).
@@ -69,7 +69,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: rectangle boundary, poly boundary, region-restricted boundary.
 - **Effort**: S.
 
-### 1.8 `poly_union(a, b)` / `poly_subtract(a, b)`
+### 1.8 `poly_union(a, b)` / `poly_subtract(a, b)` ✅
 
 - **Purpose**: build complex silhouettes as single contours (boolean ops on point arrays).
 - **API**: both take two point arrays, return a point array (or `null` for empty result). General-polygon clipping (Weiler–Atherton); convex fast-path (Sutherland–Hodgman).
@@ -81,7 +81,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 
 ## Phase 2 — Import / export
 
-### 2.1 `encode_apng(anim, opts)` / `export_apng(anim, path, opts)`
+### 2.1 `encode_apng(anim, opts)` / `export_apng(anim, path, opts)` ✅
 
 - **Purpose**: animations as real animated files (currently HTML + spritesheet only).
 - **API**: reuses the existing PNG encoder; adds `acTL` after IHDR, `fcTL` before each frame, `fdAT` for frames 2+. `opts`: `{ fps }` (defaults to `anim.fps`), `{ loop }` (default 0 = infinite).
@@ -89,7 +89,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: chunk structure (acTL/fcTL/fdAT present, correct counts), frame extraction round-trip (decode our own APNG back to per-frame buffers), determinism.
 - **Effort**: M.
 
-### 2.2 `encode_gif(anim, opts)` / `export_gif(anim, path, opts)`
+### 2.2 `encode_gif(anim, opts)` / `export_gif(anim, path, opts)` ✅
 
 - **Purpose**: GIF89a export — the universal pixel-art animation format.
 - **API**: hand-rolled LZW (GIF's LZW is simpler than DEFLATE; ~150 lines). Palette ≤ 256 colors (engine palettes are ≤ 12 — fine). `opts`: `{ fps, loop }`.
@@ -97,7 +97,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: header/LSD/GCE/image-descriptor/trailer structure, pixel round-trip via a minimal GIF reader written for the tests, determinism.
 - **Effort**: M.
 
-### 2.3 `decode_png(bytes)` → `{ width, height, rgba }`
+### 2.3 `decode_png(bytes)` → `{ width, height, rgba }` ✅
 
 - **Purpose**: PNG import — unlocks reference-driven evaluation (Phase 5) and scene-from-image workflows.
 - **API**: Node backend uses built-in `zlib.inflateSync` (zero-dep). Browser backend: canvas `drawImage` + `getImageData` when a DOM exists; pure-JS inflate (dynamic Huffman, ~300–400 lines) for DOM-less browsers — decide during implementation whether the pure-JS inflate is in scope for v1 (Node + canvas first).
@@ -106,7 +106,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: round-trip (encode → decode → identical buffer) across the hash-locked assets; corrupt-input errors; filter-type coverage.
 - **Effort**: M–L (inflate is the real work).
 
-### 2.4 `quantize_palette(rgba, maxColors)` → `{ palette, indices }`
+### 2.4 `quantize_palette(rgba, maxColors)` → `{ palette, indices }` ✅
 
 - **Purpose**: extract a palette from imported art (median-cut or popularity algorithm).
 - **API**: RGBA buffer → palette (≤ `maxColors`, default 16) + per-pixel index map.
@@ -114,7 +114,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: known-color input produces the exact palette; count cap respected; determinism.
 - **Effort**: M.
 
-### 2.5 `validate_scene(scene)` → `{ valid, errors[] }`
+### 2.5 `validate_scene(scene)` → `{ valid, errors[] }` ✅
 
 - **Purpose**: scene-document integrity — the scene-side mirror of `normalize_animation`.
 - **API**: checks `size` (square, ladder sizes), palette (keys valid, 5–12 keys), layers (known types, valid params, in-bounds), pixels (valid keys, in-bounds).
@@ -126,7 +126,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 
 ## Phase 3 — Agent-loop tools (better "eyes")
 
-### 3.1 `diff_scenes(a, b)`
+### 3.1 `diff_scenes(a, b)` ✅
 
 - **Purpose**: compare two scene documents — the co-evolution loop's iteration comparison.
 - **API**: same shape as `diff_frames`: `{ changed, unchanged, pct, bbox, changes[] }` on resolved buffers.
@@ -134,21 +134,21 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: mirror the diff_frames tests.
 - **Effort**: S (reuses the frame diff logic).
 
-### 3.2 `replace_color_region(scene, x, y, w, h, fromHex, toHex)`
+### 3.2 `replace_color_region(scene, x, y, w, h, fromHex, toHex)` ✅
 
 - **Purpose**: recolor within a region (buffer-level, writes overrides) — complements the document-level `replace_color`.
 - **Edge cases**: region empty → no-op; `from === to` → no-op.
 - **Tests**: region-limited recolor, clipping.
 - **Effort**: S.
 
-### 3.3 `measure_distance(x1, y1, x2, y2)` + region area via `inspect()`
+### 3.3 `measure_distance(x1, y1, x2, y2)` + region area via `inspect()` ✅
 
 - **Purpose**: provable proportion checks for the critic (the PROPORTION category is currently eyeballed).
 - **API**: `measure_distance` returns Euclidean distance; area/counts already exist in `inspect()`.
 - **Tests**: known distances.
 - **Effort**: S.
 
-### 3.4 `check_symmetry(scene, axis, region?)` → `{ symmetric, diffCount, diffPixels[] }`
+### 3.4 `check_symmetry(scene, axis, region?)` → `{ symmetric, diffCount, diffPixels[] }` ✅
 
 - **Purpose**: critic FACT — verify left/right (or top/bottom) consistency.
 - **API**: compares the region against its mirror on the resolved buffer.
@@ -156,7 +156,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: symmetric asset passes, asymmetric fails with the diff list.
 - **Effort**: S.
 
-### 3.5 `dither_region(scene, x, y, w, h, opts?)`
+### 3.5 `dither_region(scene, x, y, w, h, opts?)` ✅
 
 - **Purpose**: gradients at low resolution (ordered/Bayer dithering between two colors).
 - **API**: `opts`: `{ from, to, pattern }` (default 4×4 Bayer). Writes overrides.
@@ -168,21 +168,21 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 
 ## Phase 4 — Integration
 
-### 4.1 MCP server (separate package: `pixel-engine-mcp`)
+### 4.1 MCP server (separate package: `pixel-engine-mcp`) ✅
 
 - **Purpose**: expose the engine as MCP tools so any agent calls it directly instead of via CLI.
 - **API**: wraps the 37+ functions as tools (`render`, `inspect`, `read_region`, `diff_frames`, `validate_change`, `encode_png`, …). One dependency: `@modelcontextprotocol/sdk` — the zero-dep core stays untouched; the MCP package is a thin adapter.
 - **Tests**: protocol smoke tests (tool list, one call per tool class).
 - **Effort**: M.
 
-### 4.2 CI — `.github/workflows/test.yml`
+### 4.2 CI — `.github/workflows/test.yml` ✅
 
 - **Purpose**: the README admits "no CI"; run the 127-test suite on push/PR.
 - **API**: GitHub Actions, Node 18/20/22 (or 24), `npm test`.
 - **Tests**: the workflow itself is verified by a green run.
 - **Effort**: S.
 
-### 4.3 Release automation
+### 4.3 Release automation ✅
 
 - **Purpose**: script the manual release we just did (version bump → test → npm publish → tag → gh release).
 - **API**: `scripts/release.js` (or a workflow) taking the version bump type; release notes assembled from the git log since the last tag.
@@ -193,7 +193,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 
 ## Phase 5 — Taste layer (depends on Phase 2 import)
 
-### 5.1 `compare_scene_to_reference(scene, refRgba, opts)` → metrics
+### 5.1 `compare_scene_to_reference(scene, refRgba, opts)` → metrics ✅
 
 - **Purpose**: reference-driven evaluation — the taste-layer machinery discussed with the user.
 - **API**: metrics: silhouette IoU (painted-vs-transparent overlap), palette distance (per-key nearest-hex), value-histogram distance. `opts`: `{ region }`.
@@ -201,7 +201,7 @@ Scope: the full capability backlog discussed for `pixel-engine` (37 functions to
 - **Tests**: identical scene vs itself → perfect scores; known-different scenes → expected deltas.
 - **Effort**: M.
 
-### 5.2 Craft checks as engine tools
+### 5.2 Craft checks as engine tools ✅
 
 - **Purpose**: automate what the critic currently reads by hand.
 - **API**: `analyze_values(scene)` → value steps per material family (count distinct palette keys per family); `check_hue_shift(palette)` → per-family shift verdicts (shadow shifted toward blue/purple, highlight toward yellow — the craft rules from `docs/experiments/craft-rules.md`).

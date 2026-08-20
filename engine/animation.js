@@ -422,6 +422,171 @@
     require('fs').writeFileSync(path, Buffer.from(encode_spritesheet(anim, opts)));
   }
 
+  /** encode_apng(anim, opts?) -> Uint8Array of APNG bytes. opts: { fps?, loop? } (fps defaults to anim.fps, loop default 0 = infinite). */
+  function encode_apng(anim, opts) {
+    opts = opts || {};
+    if (!anim.frames || anim.frames.length === 0) {
+      throw new Error('cannot encode apng: animation has no frames');
+    }
+    const fps = opts.fps || anim.fps || 8;
+    const frames = anim.frames.map(function (fr) { return resolve_frame(anim, fr.id); });
+    return PE.encode_apng_buffer(frames, anim.width, anim.height, { fps: fps, loop: opts.loop });
+  }
+
+  /** export_apng(anim, path, opts?) — Node only. */
+  function export_apng(anim, path, opts) {
+    if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
+      throw new Error('export_apng requires Node.js');
+    }
+    require('fs').writeFileSync(path, Buffer.from(encode_apng(anim, opts)));
+  }
+
+  /** encode_gif(anim, opts?) -> Uint8Array of GIF89a bytes. opts: { fps?, loop? } (fps defaults to anim.fps, loop default 0 = infinite). */
+  function encode_gif(anim, opts) {
+    opts = opts || {};
+    if (!anim.frames || anim.frames.length === 0) {
+      throw new Error('cannot encode gif: animation has no frames');
+    }
+    const fps = opts.fps || anim.fps || 8;
+    const loop = opts.loop === undefined ? 0 : opts.loop;
+    if (!Number.isInteger(fps) || fps <= 0) {
+      throw new Error('fps must be a positive integer (got ' + fps + ')');
+    }
+    if (!Number.isInteger(loop) || loop < 0) {
+      throw new Error('loop must be a non-negative integer (got ' + loop + ')');
+    }
+
+    const buffers = anim.frames.map(function (fr) { return resolve_frame(anim, fr.id); });
+    const colorMap = new Map();
+    const colors = [];
+    let hasTransparent = false;
+    buffers.forEach(function (buf) {
+      for (let i = 0; i < buf.length; i += 4) {
+        if (buf[i + 3] === 0) { hasTransparent = true; continue; }
+        const key = buf[i] + ',' + buf[i + 1] + ',' + buf[i + 2];
+        if (!colorMap.has(key)) {
+          colorMap.set(key, colors.length);
+          colors.push([buf[i], buf[i + 1], buf[i + 2]]);
+        }
+      }
+    });
+    let transparentIndex = -1;
+    if (hasTransparent) transparentIndex = colors.length;
+    const numColors = colors.length + (hasTransparent ? 1 : 0);
+    if (numColors === 0) {
+      throw new Error('cannot encode gif: animation has no visible pixels');
+    }
+    if (numColors > 256) {
+      throw new Error('cannot encode gif: ' + colors.length + ' unique colors exceed the 256-color GIF limit');
+    }
+
+    const gctSize = Math.max(0, Math.ceil(Math.log2(numColors)) - 1);
+    const gctEntries = 1 << (gctSize + 1);
+    const minCodeSize = Math.max(2, gctSize + 1);
+    const delay = Math.max(1, Math.round(100 / fps));
+
+    const out = [];
+    out.push(0x47, 0x49, 0x46, 0x38, 0x39, 0x61); // "GIF89a"
+    // Logical screen descriptor: width, height, GCT flag + color resolution + GCT size
+    out.push(anim.width & 0xFF, (anim.width >> 8) & 0xFF);
+    out.push(anim.height & 0xFF, (anim.height >> 8) & 0xFF);
+    out.push(0x80 | (7 << 4) | gctSize, 0, 0);
+    // Global color table (padded to 2^(gctSize+1) entries)
+    colors.forEach(function (c) { out.push(c[0], c[1], c[2]); });
+    for (let i = colors.length; i < gctEntries; i++) out.push(0, 0, 0);
+    // Netscape loop extension (always written; loop 0 = infinite)
+    out.push(0x21, 0xFF, 0x0B);
+    for (let i = 0; i < 11; i++) out.push('NETSCAPE2.0'.charCodeAt(i));
+    out.push(0x03, 0x01, loop & 0xFF, (loop >> 8) & 0xFF, 0x00);
+
+    buffers.forEach(function (buf) {
+      const idx = new Uint8Array(buf.length / 4);
+      for (let i = 0, p = 0; i < buf.length; i += 4, p++) {
+        idx[p] = buf[i + 3] === 0 ? transparentIndex : colorMap.get(buf[i] + ',' + buf[i + 1] + ',' + buf[i + 2]);
+      }
+      // Graphic control extension: disposal 1 (do not dispose), optional transparency
+      out.push(0x21, 0xF9, 0x04, hasTransparent ? 0x05 : 0x04, delay & 0xFF, (delay >> 8) & 0xFF);
+      out.push(hasTransparent ? transparentIndex : 0, 0x00);
+      // Image descriptor: full-frame, no local color table, no interlace
+      out.push(0x2C, 0, 0, 0, 0);
+      out.push(anim.width & 0xFF, (anim.width >> 8) & 0xFF);
+      out.push(anim.height & 0xFF, (anim.height >> 8) & 0xFF);
+      out.push(0x00);
+      // LZW-compressed indices in 255-byte sub-blocks
+      const codes = gifLzwEncode(idx, minCodeSize);
+      out.push(minCodeSize);
+      for (let i = 0; i < codes.length; i += 255) {
+        const block = codes.subarray(i, i + 255);
+        out.push(block.length);
+        for (let j = 0; j < block.length; j++) out.push(block[j]);
+      }
+      out.push(0x00);
+    });
+    out.push(0x3B); // trailer
+    return new Uint8Array(out);
+  }
+
+  /**
+   * GIF variable-length LZW encoder (LSB-first bit packing). The code size
+   * grows when the dictionary reaches 2^codeSize entries and resets via a
+   * clear code when it would exceed the 12-bit cap (4095 entries).
+   */
+  function gifLzwEncode(pixels, minCodeSize) {
+    const clear = 1 << minCodeSize;
+    const eoi = clear + 1;
+    let codeSize = minCodeSize + 1;
+    let nextCode = eoi + 1;
+    let dict = new Map();
+    for (let i = 0; i < clear; i++) dict.set(String.fromCharCode(i), i);
+    const out = [];
+    let bitBuf = 0, bitCnt = 0;
+    const putCode = function (code) {
+      bitBuf |= code << bitCnt;
+      bitCnt += codeSize;
+      while (bitCnt >= 8) {
+        out.push(bitBuf & 0xFF);
+        bitBuf >>>= 8;
+        bitCnt -= 8;
+      }
+    };
+    putCode(clear);
+    let cur = String.fromCharCode(pixels[0]);
+    for (let i = 1; i < pixels.length; i++) {
+      const k = String.fromCharCode(pixels[i]);
+      const key = cur + k;
+      if (dict.has(key)) {
+        cur = key;
+      } else {
+        putCode(dict.get(cur));
+        if (nextCode >= 4096) {
+          putCode(clear);
+          dict = new Map();
+          for (let j = 0; j < clear; j++) dict.set(String.fromCharCode(j), j);
+          nextCode = eoi + 1;
+          codeSize = minCodeSize + 1;
+        } else {
+          dict.set(key, nextCode++);
+          // The encoder's table is one entry ahead of the decoder's at the
+          // same stream position, so it bumps the code size one code later.
+          if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
+        }
+        cur = k;
+      }
+    }
+    putCode(dict.get(cur));
+    putCode(eoi);
+    if (bitCnt > 0) out.push(bitBuf & 0xFF);
+    return Uint8Array.from(out);
+  }
+
+  /** export_gif(anim, path, opts?) — Node only. */
+  function export_gif(anim, path, opts) {
+    if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
+      throw new Error('export_gif requires Node.js');
+    }
+    require('fs').writeFileSync(path, Buffer.from(encode_gif(anim, opts)));
+  }
+
   // --------------------------------------------------------------------------
   // HTML preview (self-contained playback)
   // --------------------------------------------------------------------------
@@ -563,6 +728,10 @@
   PE.palette_drift = palette_drift;
   PE.encode_spritesheet = encode_spritesheet;
   PE.export_spritesheet = export_spritesheet;
+  PE.encode_apng = encode_apng;
+  PE.export_apng = export_apng;
+  PE.encode_gif = encode_gif;
+  PE.export_gif = export_gif;
   PE.animation_to_html = animation_to_html;
 
   return PE;

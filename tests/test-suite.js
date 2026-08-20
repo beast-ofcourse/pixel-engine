@@ -84,6 +84,45 @@ function hash256(buf) {
   return crypto.createHash('sha256').update(Buffer.from(buf)).digest('hex');
 }
 
+function sameContour(a, b) {
+  if (a.length !== b.length) return false;
+  const n = a.length;
+  if (n === 0) return true;
+  for (let i = 0; i < n; i++) {
+    if (a[i][0] === b[0][0] && a[i][1] === b[0][1]) {
+      let fwd = true, rev = true;
+      for (let k = 1; k < n; k++) {
+        const j = (i + k) % n;
+        if (fwd && (a[j][0] !== b[k][0] || a[j][1] !== b[k][1])) fwd = false;
+        if (rev && (a[j][0] !== b[n - k][0] || a[j][1] !== b[n - k][1])) rev = false;
+      }
+      if (fwd || rev) return true;
+    }
+  }
+  return false;
+}
+
+function inPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function centerKeys(poly, size) {
+  const keys = new Set();
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    if (inPoly(x + 0.5, y + 0.5, poly)) keys.add(x + ',' + y);
+  }
+  return keys;
+}
+
+function polyScene(size, points, color) {
+  return mk(size, [{ id: 'p', type: 'poly', points: points, color: color }], {}, { red: R });
+}
+
 // --- PNG parsing helpers ----------------------------------------------------
 
 function crc32(bytes) {
@@ -654,6 +693,685 @@ test('read_region: region fully outside canvas -> empty, no crash', () => {
 });
 
 // ---------------------------------------------------------------------------
+// mirror_region
+// ---------------------------------------------------------------------------
+
+test('mirror_region: 4x4 region mirrored h (left<->right)', () => {
+  const s = mk(4);
+  PE.fill_region(s, 0, 0, 2, 4, R);
+  PE.set_pixel(s, 1, 1, G);
+  const r = PE.mirror_region(s, 0, 0, 4, 4, 'h');
+  assert.strictEqual(r.mirrored, 8);
+  assert.strictEqual(grid(s, CH), [
+    'RRRR',
+    'RGGR',
+    'RRRR',
+    'RRRR'
+  ].join('\n'));
+});
+
+test('mirror_region: 4x4 region mirrored v (top<->bottom)', () => {
+  const s = mk(4);
+  PE.fill_region(s, 0, 0, 2, 4, R);
+  PE.set_pixel(s, 1, 1, G);
+  const r = PE.mirror_region(s, 0, 0, 4, 4, 'v');
+  assert.strictEqual(r.mirrored, 8);
+  assert.strictEqual(grid(s, CH), [
+    'RR..',
+    'RR..',
+    'RG..',
+    'RR..'
+  ].join('\n'));
+});
+
+test('mirror_region: odd width keeps the center column', () => {
+  const s = mk(5);
+  PE.fill_region(s, 0, 0, 3, 5, R);
+  PE.set_pixel(s, 1, 1, G);
+  const r = PE.mirror_region(s, 0, 0, 5, 5, 'h');
+  assert.strictEqual(r.mirrored, 15);
+  assert.strictEqual(grid(s, CH), [
+    'RRRRR',
+    'RGRGR',
+    'RRRRR',
+    'RRRRR',
+    'RRRRR'
+  ].join('\n'));
+});
+
+test('mirror_region: out-of-bounds region clamped', () => {
+  const s = mk(4);
+  PE.fill_region(s, 0, 0, 2, 4, R);
+  PE.set_pixel(s, 1, 1, G);
+  const r = PE.mirror_region(s, -1, 0, 4, 4, 'h');
+  assert.strictEqual(r.mirrored, 8);
+  assert.strictEqual(grid(s, CH), [
+    'RR..',
+    'GR..',
+    'RR..',
+    'RR..'
+  ].join('\n'));
+});
+
+test('mirror_region: fully out of bounds -> no-op', () => {
+  const s = mk(4);
+  PE.fill_region(s, 0, 0, 2, 4, R);
+  const before = grid(s, CH);
+  const r = PE.mirror_region(s, 10, 10, 4, 4, 'h');
+  assert.strictEqual(r.mirrored, 0);
+  assert.strictEqual(grid(s, CH), before);
+});
+
+test('mirror_region: zero-size region -> no-op', () => {
+  const s = mk(4);
+  PE.fill_region(s, 0, 0, 2, 4, R);
+  const before = grid(s, CH);
+  assert.strictEqual(PE.mirror_region(s, 0, 0, 0, 4, 'h').mirrored, 0);
+  assert.strictEqual(PE.mirror_region(s, 0, 0, 4, 0, 'v').mirrored, 0);
+  assert.strictEqual(PE.mirror_region(s, 0, 0, -2, 4, 'h').mirrored, 0);
+  assert.strictEqual(grid(s, CH), before);
+});
+
+test('mirror_region: invalid axis throws', () => {
+  const s = mk(4);
+  PE.fill_region(s, 0, 0, 2, 4, R);
+  assert.throws(() => PE.mirror_region(s, 0, 0, 4, 4, 'x'), /axis/);
+  assert.throws(() => PE.mirror_region(s, 0, 0, 4, 4), /axis/);
+});
+
+test('mirror_region: destination side overwritten by source mirror', () => {
+  const s = mk(4);
+  PE.fill_region(s, 0, 0, 4, 4, B);
+  PE.set_pixel(s, 0, 0, R);
+  PE.set_pixel(s, 1, 0, R);
+  PE.set_pixel(s, 2, 0, G);
+  PE.set_pixel(s, 3, 0, G);
+  PE.mirror_region(s, 0, 0, 4, 4, 'h');
+  assert.strictEqual(grid(s, CH), [
+    'GGRR',
+    'BBBB',
+    'BBBB',
+    'BBBB'
+  ].join('\n'));
+});
+
+test('mirror_region: idempotent on the second call', () => {
+  const s = mk(4);
+  PE.fill_region(s, 0, 0, 2, 4, R);
+  PE.set_pixel(s, 1, 1, G);
+  PE.mirror_region(s, 0, 0, 4, 4, 'h');
+  const first = PE.rasterize(s);
+  PE.mirror_region(s, 0, 0, 4, 4, 'h');
+  const second = PE.rasterize(s);
+  assert.deepStrictEqual(second, first);
+});
+
+test('mirror_region: determinism (same input -> identical bytes)', () => {
+  const mkMirrored = () => {
+    const s = mk(4);
+    PE.fill_region(s, 0, 0, 2, 4, R);
+    PE.set_pixel(s, 1, 1, G);
+    PE.mirror_region(s, 0, 0, 4, 4, 'h');
+    return PE.rasterize(s);
+  };
+  assert.deepStrictEqual(mkMirrored(), mkMirrored());
+});
+
+// ---------------------------------------------------------------------------
+// replace_color
+// ---------------------------------------------------------------------------
+
+test('replace_color: key->key rewrites layers and pixels', () => {
+  const s = mk(4, [
+    { id: 'a', type: 'rect', x: 0, y: 0, w: 2, h: 2, color: 'red' },
+    { id: 'b', type: 'rect', x: 2, y: 2, w: 2, h: 2, color: 'blue' }
+  ], { '0,0': 'red', '3,3': 'blue' }, { red: R, blue: B });
+  const r = PE.replace_color(s, 'red', 'blue');
+  assert.strictEqual(r.replaced, 2);
+  assert.strictEqual(s.layers[0].color, 'blue');
+  assert.strictEqual(s.layers[1].color, 'blue');
+  assert.strictEqual(s.pixels['0,0'], 'blue');
+  assert.strictEqual(s.pixels['3,3'], 'blue');
+  assert.strictEqual(s.palette.red, R);
+});
+
+test('replace_color: hex->key remaps every key with that hex', () => {
+  const s = mk(4, [
+    { id: 'a', type: 'rect', x: 0, y: 0, w: 2, h: 2, color: 'red' },
+    { id: 'b', type: 'rect', x: 2, y: 0, w: 2, h: 2, color: 'crimson' }
+  ], { '0,0': 'red' }, { red: R, crimson: R, blue: B });
+  const r = PE.replace_color(s, R, 'blue');
+  assert.strictEqual(r.replaced, 3);
+  assert.strictEqual(s.layers[0].color, 'blue');
+  assert.strictEqual(s.layers[1].color, 'blue');
+  assert.strictEqual(s.pixels['0,0'], 'blue');
+});
+
+test('replace_color: key->new-hex adds a palette key', () => {
+  const s = mk(4, [{ id: 'a', type: 'rect', x: 0, y: 0, w: 2, h: 2, color: 'red' }], {}, { red: R });
+  const r = PE.replace_color(s, 'red', G);
+  assert.strictEqual(r.replaced, 1);
+  assert.strictEqual(s.layers[0].color, 'color0');
+  assert.strictEqual(s.palette.color0, G);
+  assert.strictEqual(s.palette.red, R);
+});
+
+test('replace_color: hex->hex reuses an existing key with that hex', () => {
+  const s = mk(4, [{ id: 'a', type: 'rect', x: 0, y: 0, w: 2, h: 2, color: 'red' }], {}, { red: R, green: G });
+  const r = PE.replace_color(s, 'red', G);
+  assert.strictEqual(r.replaced, 1);
+  assert.strictEqual(s.layers[0].color, 'green');
+  assert.deepStrictEqual(Object.keys(s.palette).sort(), ['green', 'red']);
+});
+
+test('replace_color: no-op cases (same key, same hex, unknown from)', () => {
+  const s = mk(4, [{ id: 'a', type: 'rect', x: 0, y: 0, w: 2, h: 2, color: 'red' }], { '0,0': 'red' }, { red: R });
+  assert.strictEqual(PE.replace_color(s, 'red', 'red').replaced, 0);
+  assert.strictEqual(PE.replace_color(s, 'red', R).replaced, 0);
+  assert.strictEqual(PE.replace_color(s, R, R).replaced, 0);
+  assert.strictEqual(PE.replace_color(s, 'ghost', 'red').replaced, 0);
+  assert.strictEqual(PE.replace_color(s, '#123456', 'red').replaced, 0);
+  assert.strictEqual(s.layers[0].color, 'red');
+  assert.strictEqual(s.pixels['0,0'], 'red');
+});
+
+test('replace_color: unknown target key throws', () => {
+  const s = mk(4, [{ id: 'a', type: 'rect', x: 0, y: 0, w: 2, h: 2, color: 'red' }], {}, { red: R });
+  assert.throws(() => PE.replace_color(s, 'red', 'ghost'), /target/);
+  assert.throws(() => PE.replace_color(s, 'red', '#zzzzzz'), /target/);
+});
+
+test('replace_color: rasterized output recolored', () => {
+  const s = mk(4, [{ id: 'a', type: 'rect', x: 0, y: 0, w: 4, h: 4, color: 'red' }], {}, { red: R, blue: B });
+  PE.replace_color(s, 'red', 'blue');
+  assert.strictEqual(grid(s, CH), [
+    'BBBB',
+    'BBBB',
+    'BBBB',
+    'BBBB'
+  ].join('\n'));
+});
+
+test('replace_color: null pixel clears untouched', () => {
+  const s = mk(4, [{ id: 'a', type: 'rect', x: 0, y: 0, w: 4, h: 4, color: 'red' }], { '0,0': null }, { red: R, blue: B });
+  const r = PE.replace_color(s, 'red', 'blue');
+  assert.strictEqual(r.replaced, 1);
+  assert.strictEqual(s.pixels['0,0'], null);
+});
+
+// ---------------------------------------------------------------------------
+// flood_fill
+// ---------------------------------------------------------------------------
+
+test('flood_fill: enclosed region on transparent canvas', () => {
+  const s = mk(8, [{ id: 'ring', type: 'rectout', x: 1, y: 1, w: 6, h: 6, color: 'red' }], {}, { red: R, green: G });
+  const r = PE.flood_fill(s, 4, 4, 'green');
+  assert.strictEqual(r.filled, 16);
+  assert.strictEqual(grid(s, CH), [
+    '........',
+    '.RRRRRR.',
+    '.RGGGGR.',
+    '.RGGGGR.',
+    '.RGGGGR.',
+    '.RGGGGR.',
+    '.RRRRRR.',
+    '........'
+  ].join('\n'));
+});
+
+test('flood_fill: region on filled background', () => {
+  const s = mk(8, [
+    { id: 'bg', type: 'fill', color: 'blue' },
+    { id: 'blob', type: 'rect', x: 2, y: 2, w: 4, h: 4, color: 'red' }
+  ], {}, { red: R, blue: B, green: G });
+  const r = PE.flood_fill(s, 3, 3, 'green');
+  assert.strictEqual(r.filled, 16);
+  assert.strictEqual(grid(s, CH), [
+    'BBBBBBBB',
+    'BBBBBBBB',
+    'BBGGGGBB',
+    'BBGGGGBB',
+    'BBGGGGBB',
+    'BBGGGGBB',
+    'BBBBBBBB',
+    'BBBBBBBB'
+  ].join('\n'));
+});
+
+test('flood_fill: fill with background color erases (erase-by-reveal)', () => {
+  const s = mk(8, [
+    { id: 'bg', type: 'fill', color: 'blue' },
+    { id: 'blob', type: 'rect', x: 2, y: 2, w: 4, h: 4, color: 'red' }
+  ], {}, { red: R, blue: B });
+  const r = PE.flood_fill(s, 3, 3, 'blue');
+  assert.strictEqual(r.filled, 16);
+  assert.strictEqual(grid(s, CH), [
+    'BBBBBBBB',
+    'BBBBBBBB',
+    'BBBBBBBB',
+    'BBBBBBBB',
+    'BBBBBBBB',
+    'BBBBBBBB',
+    'BBBBBBBB',
+    'BBBBBBBB'
+  ].join('\n'));
+});
+
+test('flood_fill: transparent seed fills the connected empty region', () => {
+  const s = mk(8, [{ id: 'blob', type: 'rect', x: 0, y: 0, w: 3, h: 3, color: 'red' }], {}, { red: R, green: G });
+  const r = PE.flood_fill(s, 7, 7, 'green');
+  assert.strictEqual(r.filled, 55);
+  assert.strictEqual(grid(s, CH), [
+    'RRRGGGGG',
+    'RRRGGGGG',
+    'RRRGGGGG',
+    'GGGGGGGG',
+    'GGGGGGGG',
+    'GGGGGGGG',
+    'GGGGGGGG',
+    'GGGGGGGG'
+  ].join('\n'));
+});
+
+test('flood_fill: hex color writes hex overrides', () => {
+  const s = mk(8, [{ id: 'ring', type: 'rectout', x: 1, y: 1, w: 6, h: 6, color: 'red' }], {}, { red: R });
+  const r = PE.flood_fill(s, 4, 4, G);
+  assert.strictEqual(r.filled, 16);
+  assert.strictEqual(s.pixels['4,4'], G);
+  assert.strictEqual(PE.get_pixel(s, 4, 4), G);
+});
+
+test('flood_fill: tolerance matches similar colors, clamps to [0,255]', () => {
+  const mkTol = () => {
+    const s = mk(8, [{ id: 'bg', type: 'fill', color: 'blue' }], {}, { blue: B, green: G });
+    PE.set_pixel(s, 2, 2, '#ff0000');
+    PE.set_pixel(s, 3, 2, '#ff1000');
+    PE.set_pixel(s, 4, 2, '#ff2000');
+    return s;
+  };
+  // default tolerance 0: exact match only
+  const s0 = mkTol();
+  assert.strictEqual(PE.flood_fill(s0, 2, 2, 'green').filled, 1);
+  assert.strictEqual(PE.get_pixel(s0, 3, 2), '#ff1000');
+  // tolerance 20: matches 16-diff, stops at 32-diff
+  const s20 = mkTol();
+  assert.strictEqual(PE.flood_fill(s20, 2, 2, 'green', 20).filled, 2);
+  assert.strictEqual(PE.get_pixel(s20, 2, 2), G);
+  assert.strictEqual(PE.get_pixel(s20, 3, 2), G);
+  assert.strictEqual(PE.get_pixel(s20, 4, 2), '#ff2000');
+  // negative tolerance clamps to 0
+  const sNeg = mkTol();
+  assert.strictEqual(PE.flood_fill(sNeg, 2, 2, 'green', -5).filled, 1);
+  // huge tolerance clamps to 255: matches everything (per-channel diff <= 255)
+  const sBig = mkTol();
+  assert.strictEqual(PE.flood_fill(sBig, 2, 2, 'green', 999).filled, 64);
+  assert.strictEqual(PE.get_pixel(sBig, 4, 2), G);
+  assert.strictEqual(PE.get_pixel(sBig, 0, 0), G);
+});
+
+test('flood_fill: no-op cases (OOB seed, seed already fill color)', () => {
+  const s = mk(8, [
+    { id: 'bg', type: 'fill', color: 'blue' },
+    { id: 'blob', type: 'rect', x: 2, y: 2, w: 4, h: 4, color: 'red' }
+  ], {}, { red: R, blue: B });
+  assert.strictEqual(PE.flood_fill(s, -1, 0, 'red').filled, 0);
+  assert.strictEqual(PE.flood_fill(s, 0, 8, 'red').filled, 0);
+  assert.strictEqual(PE.flood_fill(s, 3, 3, 'red').filled, 0);
+  assert.strictEqual(PE.flood_fill(s, 3, 3, R).filled, 0);
+  assert.strictEqual(PE.get_pixel(s, 3, 3), R);
+  assert.strictEqual(PE.get_pixel(s, 0, 0), B);
+});
+
+// ---------------------------------------------------------------------------
+// curve layer type
+// ---------------------------------------------------------------------------
+
+test('curve: open curve through 3 points (filled, chord closes)', () => {
+  const s = mk(8, [{ id: 'c', type: 'curve', points: [[2, 2], [5, 2], [5, 5]], color: 'red' }], {}, { red: R });
+  assert.strictEqual(grid(s, CH), [
+    '........',
+    '........',
+    '..RRRR..',
+    '...RRR..',
+    '....RR..',
+    '........',
+    '........',
+    '........'
+  ].join('\n'));
+});
+
+test('curve: closed loop through 4 points (rounded square)', () => {
+  const s = mk(8, [{ id: 'c', type: 'curve', points: [[2, 2], [6, 2], [6, 6], [2, 6]], closed: true, color: 'red' }], {}, { red: R });
+  assert.strictEqual(grid(s, CH), [
+    '........',
+    '........',
+    '..RRRRR.',
+    '..RRRRR.',
+    '..RRRRR.',
+    '..RRRRR.',
+    '..RRRRR.',
+    '........'
+  ].join('\n'));
+});
+
+test('curve: closed loop through 3 points (rounded triangle)', () => {
+  const s = mk(8, [{ id: 'c', type: 'curve', points: [[1, 6], [4, 1], [7, 6]], closed: true, color: 'red' }], {}, { red: R });
+  assert.strictEqual(grid(s, CH), [
+    '........',
+    '....R...',
+    '...RRR..',
+    '...RRR..',
+    '..RRRRR.',
+    '..RRRRR.',
+    '.RRRRRRR',
+    '........'
+  ].join('\n'));
+});
+
+test('curve: passes through the control points (closed loop corners painted)', () => {
+  const s = mk(8, [{ id: 'c', type: 'curve', points: [[2, 2], [6, 2], [6, 6], [2, 6]], closed: true, color: 'red' }], {}, { red: R });
+  for (const p of [[2, 2], [6, 2], [6, 6], [2, 6]]) {
+    assert.strictEqual(PE.get_pixel(s, p[0], p[1]), R);
+  }
+});
+
+test('curve: degenerate inputs (<2 points paints nothing, 2 points locked, OOB clipped)', () => {
+  assert.strictEqual(countPainted(mk(8, [{ id: 'a', type: 'curve', points: [], color: 'red' }], {}, { red: R })), 0);
+  assert.strictEqual(countPainted(mk(8, [{ id: 'a', type: 'curve', points: [[2, 2]], color: 'red' }], {}, { red: R })), 0);
+  assert.strictEqual(countPainted(mk(8, [{ id: 'a', type: 'curve', color: 'red' }], {}, { red: R })), 0);
+  // 2 collinear points: degenerate doubled polygon paints a partial diagonal
+  const two = mk(8, [{ id: 'a', type: 'curve', points: [[2, 2], [5, 5]], color: 'red' }], {}, { red: R });
+  assert.strictEqual(countPainted(two), 3);
+  assert.strictEqual(grid(two, CH), [
+    '........',
+    '........',
+    '..R.....',
+    '...R....',
+    '....R...',
+    '........',
+    '........',
+    '........'
+  ].join('\n'));
+  // out-of-bounds points clipped, no crash
+  const clip = mk(8, [{ id: 'a', type: 'curve', points: [[-2, -2], [4, 4], [10, 10]], closed: true, color: 'red' }], {}, { red: R });
+  assert.strictEqual(countPainted(clip), 8);
+});
+
+test('curve-test.json: rasterize hash locked (leaf asset)', () => {
+  const s = loadScene('curve-test');
+  assert.strictEqual(hash256(PE.rasterize(s)), 'b176fa4a5e66ed6d815351d7f884dd03f73ef06f678e795cb098ce644df288b0');
+});
+
+// ---------------------------------------------------------------------------
+// draw_cluster
+// ---------------------------------------------------------------------------
+
+test('draw_cluster: offset pattern writes overrides at (x,y)', () => {
+  const s = mk(8, [{ id: 'bg', type: 'fill', color: 'blue' }], {}, { red: R, blue: B });
+  const r = PE.draw_cluster(s, 2, 3, [[0, 0], [1, 0], [0, 1]], 'red');
+  assert.strictEqual(r.painted, 3);
+  assert.strictEqual(PE.get_pixel(s, 2, 3), R);
+  assert.strictEqual(PE.get_pixel(s, 3, 3), R);
+  assert.strictEqual(PE.get_pixel(s, 2, 4), R);
+  assert.strictEqual(PE.get_pixel(s, 3, 4), B);
+});
+
+test('draw_cluster: string-grid pattern (non-. chars paint)', () => {
+  const s = mk(8, [{ id: 'bg', type: 'fill', color: 'blue' }], {}, { red: R, blue: B });
+  const r = PE.draw_cluster(s, 1, 1, ['X.X', '.X.'], 'red');
+  assert.strictEqual(r.painted, 3);
+  assert.strictEqual(PE.get_pixel(s, 1, 1), R);
+  assert.strictEqual(PE.get_pixel(s, 3, 1), R);
+  assert.strictEqual(PE.get_pixel(s, 2, 2), R);
+  assert.strictEqual(PE.get_pixel(s, 2, 1), B);
+  assert.strictEqual(PE.get_pixel(s, 1, 2), B);
+});
+
+test('draw_cluster: out-of-bounds clipped, empty pattern no-op', () => {
+  const s = mk(8, [{ id: 'bg', type: 'fill', color: 'blue' }], {}, { red: R, blue: B });
+  assert.strictEqual(PE.draw_cluster(s, 7, 7, [[1, 1], [2, 2]], 'red').painted, 0);
+  assert.strictEqual(PE.draw_cluster(s, 7, 0, [[0, 0], [1, 0], [0, 1]], 'red').painted, 2);
+  assert.strictEqual(PE.draw_cluster(s, 0, 0, [[-1, 0], [0, 0]], 'red').painted, 1);
+  assert.strictEqual(PE.draw_cluster(s, 2, 2, [], 'red').painted, 0);
+  assert.strictEqual(PE.draw_cluster(s, 2, 2, null, 'red').painted, 0);
+});
+
+// ---------------------------------------------------------------------------
+// move_region / copy_region
+// ---------------------------------------------------------------------------
+
+test('move_region: moves opaque pixels, clears sources (erase-by-reveal)', () => {
+  const s = mk(8, [{ id: 'bg', type: 'fill', color: 'blue' }], {}, { red: R, blue: B });
+  for (let y = 2; y <= 4; y++) for (let x = 2; x <= 4; x++) PE.set_pixel(s, x, y, 'red');
+  const r = PE.move_region(s, 2, 2, 3, 3, 2, 1);
+  assert.strictEqual(r.moved, 9);
+  assert.strictEqual(PE.get_pixel(s, 4, 3), R);
+  assert.strictEqual(PE.get_pixel(s, 5, 3), R);
+  assert.strictEqual(PE.get_pixel(s, 2, 2), B);
+  assert.strictEqual(PE.get_pixel(s, 3, 3), B);
+});
+
+test('move_region: overlapping move clears sources before writing destinations', () => {
+  const s = mk(8, [{ id: 'bg', type: 'fill', color: 'blue' }], {}, { red: R, blue: B });
+  for (let y = 2; y <= 4; y++) for (let x = 2; x <= 4; x++) PE.set_pixel(s, x, y, 'red');
+  const r = PE.move_region(s, 2, 2, 3, 3, 1, 0);
+  assert.strictEqual(r.moved, 9);
+  for (let y = 2; y <= 4; y++) {
+    for (let x = 3; x <= 5; x++) {
+      assert.strictEqual(PE.get_pixel(s, x, y), R);
+    }
+  }
+  assert.strictEqual(PE.get_pixel(s, 2, 2), B);
+  assert.strictEqual(PE.get_pixel(s, 2, 4), B);
+});
+
+test('move_region: destination out of bounds clipped, transparent sources untouched', () => {
+  const s = mk(8, [{ id: 'bg', type: 'fill', color: 'blue' }], {}, { red: R, blue: B });
+  for (let y = 4; y <= 5; y++) for (let x = 4; x <= 5; x++) PE.set_pixel(s, x, y, 'red');
+  const r = PE.move_region(s, 4, 4, 2, 2, 3, 3);
+  assert.strictEqual(r.moved, 1);
+  assert.strictEqual(PE.get_pixel(s, 7, 7), R);
+  assert.strictEqual(PE.get_pixel(s, 4, 4), B);
+  const t = mk(8, [], {}, { red: R });
+  PE.set_pixel(t, 2, 2, 'red');
+  assert.strictEqual(PE.move_region(t, 1, 1, 4, 4, 2, 0).moved, 1);
+  assert.strictEqual(PE.get_pixel(t, 4, 2), R);
+  assert.strictEqual(PE.get_pixel(t, 1, 1), null);
+});
+
+test('copy_region: copies opaque pixels, source unchanged', () => {
+  const s = mk(8, [
+    { id: 'bg', type: 'fill', color: 'blue' },
+    { id: 'blob', type: 'rect', x: 2, y: 2, w: 2, h: 2, color: 'red' }
+  ], {}, { red: R, blue: B });
+  const r = PE.copy_region(s, 2, 2, 2, 2, 4, 0);
+  assert.strictEqual(r.copied, 4);
+  assert.strictEqual(PE.get_pixel(s, 2, 2), R);
+  assert.strictEqual(PE.get_pixel(s, 6, 2), R);
+  assert.strictEqual(PE.get_pixel(s, 6, 3), R);
+  assert.strictEqual(PE.get_pixel(s, 4, 2), B);
+});
+
+test('copy_region: destination out of bounds clipped', () => {
+  const s = mk(8, [
+    { id: 'bg', type: 'fill', color: 'blue' },
+    { id: 'blob', type: 'rect', x: 2, y: 2, w: 2, h: 2, color: 'red' }
+  ], {}, { red: R, blue: B });
+  const r = PE.copy_region(s, 2, 2, 2, 2, 5, 5);
+  assert.strictEqual(r.copied, 1);
+  assert.strictEqual(PE.get_pixel(s, 7, 7), R);
+});
+
+// extract_outline
+test('extract_outline: 3x3 rect ring = 8 boundary pixels', () => {
+  const s = mk(8, [{ id: 'r', type: 'rect', x: 2, y: 2, w: 3, h: 3, color: 'red' }], {}, { red: R });
+  assert.deepStrictEqual(PE.extract_outline(s), [
+    { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 },
+    { x: 2, y: 3 }, { x: 4, y: 3 },
+    { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 }
+  ]);
+});
+
+test('extract_outline: 4x4 rect ring = 12 boundary pixels', () => {
+  const s = mk(8, [{ id: 'r', type: 'rect', x: 2, y: 2, w: 4, h: 4, color: 'red' }], {}, { red: R });
+  assert.deepStrictEqual(PE.extract_outline(s), [
+    { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 }, { x: 5, y: 2 },
+    { x: 2, y: 3 }, { x: 5, y: 3 },
+    { x: 2, y: 4 }, { x: 5, y: 4 },
+    { x: 2, y: 5 }, { x: 3, y: 5 }, { x: 4, y: 5 }, { x: 5, y: 5 }
+  ]);
+});
+
+test('extract_outline: poly silhouette boundary', () => {
+  const s = mk(8, [{ id: 't', type: 'poly', points: [[2, 2], [5, 2], [2, 5]], color: 'red' }], {}, { red: R });
+  assert.deepStrictEqual(PE.extract_outline(s), [
+    { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 }, { x: 5, y: 2 },
+    { x: 2, y: 3 }, { x: 4, y: 3 },
+    { x: 2, y: 4 }, { x: 3, y: 4 }
+  ]);
+});
+
+test('extract_outline: region restricts to its own ring', () => {
+  const s = mk(8, [{ id: 'f', type: 'fill', color: 'red' }], {}, { red: R });
+  assert.deepStrictEqual(PE.extract_outline(s, { x: 2, y: 2, w: 3, h: 3 }), [
+    { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 4, y: 2 },
+    { x: 2, y: 3 }, { x: 4, y: 3 },
+    { x: 2, y: 4 }, { x: 3, y: 4 }, { x: 4, y: 4 }
+  ]);
+});
+
+test('extract_outline: empty region -> []', () => {
+  const s = mk(8, [{ id: 'f', type: 'fill', color: 'red' }], {}, { red: R });
+  assert.deepStrictEqual(PE.extract_outline(s, { x: 0, y: 0, w: 0, h: 0 }), []);
+});
+
+test('extract_outline: fully painted canvas -> canvas edge ring', () => {
+  const s = mk(4, [{ id: 'f', type: 'fill', color: 'red' }], {}, { red: R });
+  assert.deepStrictEqual(PE.extract_outline(s), [
+    { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 },
+    { x: 0, y: 1 }, { x: 3, y: 1 },
+    { x: 0, y: 2 }, { x: 3, y: 2 },
+    { x: 0, y: 3 }, { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 }
+  ]);
+});
+
+test('extract_outline: region clipped at canvas edge', () => {
+  const s = mk(4, [{ id: 'f', type: 'fill', color: 'red' }], {}, { red: R });
+  assert.deepStrictEqual(PE.extract_outline(s, { x: -2, y: -2, w: 4, h: 4 }), [
+    { x: 0, y: 0 }, { x: 1, y: 0 },
+    { x: 0, y: 1 }, { x: 1, y: 1 }
+  ]);
+});
+
+// poly_union / poly_subtract
+test('poly_union: overlapping squares -> merged rectangle', () => {
+  const S = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  const C = [[2, 0], [6, 0], [6, 4], [2, 4]];
+  assert.ok(sameContour(PE.poly_union(S, C), [[0, 0], [2, 0], [4, 0], [6, 0], [6, 4], [4, 4], [2, 4], [0, 4]]));
+});
+
+test('poly_subtract: overlapping squares -> left strip', () => {
+  const S = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  const C = [[2, 0], [6, 0], [6, 4], [2, 4]];
+  assert.ok(sameContour(PE.poly_subtract(S, C), [[0, 0], [2, 0], [2, 4], [0, 4]]));
+});
+
+test('poly_union: staircase + contained square -> staircase', () => {
+  const S = [[0, 0], [4, 0], [4, 2], [6, 2], [6, 6], [2, 6], [2, 4], [0, 4]];
+  const C = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  assert.ok(sameContour(PE.poly_union(S, C), S));
+});
+
+test('poly_subtract: staircase minus contained square -> L region', () => {
+  const S = [[0, 0], [4, 0], [4, 2], [6, 2], [6, 6], [2, 6], [2, 4], [0, 4]];
+  const C = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  assert.ok(sameContour(PE.poly_subtract(S, C), [[6, 2], [6, 6], [2, 6], [2, 4], [4, 4], [4, 2]]));
+});
+
+test('poly_union: disjoint -> both contours concatenated', () => {
+  const S = [[0, 0], [2, 0], [2, 2], [0, 2]];
+  const C = [[4, 4], [6, 4], [6, 6], [4, 6]];
+  assert.deepStrictEqual(PE.poly_union(S, C), S.concat(C));
+});
+
+test('poly_subtract: disjoint -> subject unchanged', () => {
+  const S = [[0, 0], [2, 0], [2, 2], [0, 2]];
+  const C = [[4, 4], [6, 4], [6, 6], [4, 6]];
+  assert.deepStrictEqual(PE.poly_subtract(S, C), S);
+});
+
+test('poly_union: identical -> copy', () => {
+  const S = [[0, 0], [2, 0], [2, 2], [0, 2]];
+  const r = PE.poly_union(S, S);
+  assert.deepStrictEqual(r, S);
+  assert.notStrictEqual(r, S);
+});
+
+test('poly_subtract: identical -> null', () => {
+  const S = [[0, 0], [2, 0], [2, 2], [0, 2]];
+  assert.strictEqual(PE.poly_subtract(S, S), null);
+});
+
+test('poly_union: degenerate subject -> clip', () => {
+  const C = [[0, 0], [2, 0], [2, 2], [0, 2]];
+  assert.deepStrictEqual(PE.poly_union([[0, 0], [2, 0], [1, 0]], C), C);
+  assert.deepStrictEqual(PE.poly_union([[0, 0], [2, 0], [2, 0], [0, 0]], C), C);
+});
+
+test('poly_subtract: degenerate subject -> null', () => {
+  const C = [[0, 0], [2, 0], [2, 2], [0, 2]];
+  assert.strictEqual(PE.poly_subtract([[0, 0], [2, 0], [1, 0]], C), null);
+});
+
+test('poly_union: subject inside clip -> clip', () => {
+  const S = [[1, 1], [3, 1], [3, 3], [1, 3]];
+  const C = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  assert.deepStrictEqual(PE.poly_union(S, C), C);
+});
+
+test('poly_subtract: subject inside clip -> null', () => {
+  const S = [[1, 1], [3, 1], [3, 3], [1, 3]];
+  const C = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  assert.strictEqual(PE.poly_subtract(S, C), null);
+});
+
+test('poly_subtract: clip inside subject -> subject (hole not representable)', () => {
+  const S = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  const C = [[1, 1], [3, 1], [3, 3], [1, 3]];
+  assert.deepStrictEqual(PE.poly_subtract(S, C), S);
+});
+
+test('poly_union: rasterized result covers pixel union (overlapping squares)', () => {
+  const S = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  const C = [[2, 0], [6, 0], [6, 4], [2, 4]];
+  const expected = new Set([...centerKeys(S, 8), ...centerKeys(C, 8)]);
+  const r = PE.poly_union(S, C);
+  assert.ok(r);
+  assert.deepStrictEqual(centerKeys(r, 8), expected);
+});
+
+test('poly_subtract: rasterized result covers pixel difference (overlapping squares)', () => {
+  const S = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  const C = [[2, 0], [6, 0], [6, 4], [2, 4]];
+  const sKeys = centerKeys(S, 8), cKeys = centerKeys(C, 8);
+  const expected = new Set([...sKeys].filter(k => !cKeys.has(k)));
+  const r = PE.poly_subtract(S, C);
+  assert.ok(r);
+  assert.deepStrictEqual(centerKeys(r, 8), expected);
+});
+
+test('poly_union/subtract: rasterized result matches pixel ops (staircase)', () => {
+  const S = [[0, 0], [4, 0], [4, 2], [6, 2], [6, 6], [2, 6], [2, 4], [0, 4]];
+  const C = [[0, 0], [4, 0], [4, 4], [0, 4]];
+  const sKeys = centerKeys(S, 8), cKeys = centerKeys(C, 8);
+  const u = PE.poly_union(S, C);
+  const d = PE.poly_subtract(S, C);
+  assert.ok(u && d);
+  assert.deepStrictEqual(centerKeys(u, 8), new Set([...sKeys, ...cKeys]));
+  assert.deepStrictEqual(centerKeys(d, 8), new Set([...sKeys].filter(k => !cKeys.has(k))));
+});
+
+// ---------------------------------------------------------------------------
 // PNG encoding
 // ---------------------------------------------------------------------------
 
@@ -719,6 +1437,410 @@ test('png: deflate handles high-entropy data (round-trip still exact)', () => {
   }
   const png = PE.encode_png(s);
   assert.deepStrictEqual(inflateIDAT(png), rawRows(s));
+});
+
+// --- PNG import (decode_png) ------------------------------------------------
+
+function pngChunk(type, data) {
+  const out = Buffer.alloc(12 + data.length);
+  out.writeUInt32BE(data.length, 0);
+  out.write(type, 4, 'ascii');
+  data.copy(out, 8);
+  out.writeUInt32BE(crc32(Buffer.concat([out.subarray(4, 8), data])), 8 + data.length);
+  return out;
+}
+
+/** Assemble a PNG from raw filter-prefixed scanlines (test encoder-side). */
+function buildPNG(width, height, colorType, raw, plte, trns) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = colorType;
+  const chunks = [pngChunk('IHDR', ihdr)];
+  if (plte) chunks.push(pngChunk('PLTE', plte));
+  if (trns) chunks.push(pngChunk('tRNS', trns));
+  chunks.push(pngChunk('IDAT', zlib.deflateSync(raw)));
+  chunks.push(pngChunk('IEND', Buffer.alloc(0)));
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])].concat(chunks));
+}
+
+/** Encoder-side filter: bytes the decoder reconstructs back to orig (given above row). */
+function filterRow(orig, above, filter, bpp) {
+  const out = Buffer.alloc(orig.length);
+  for (let x = 0; x < orig.length; x++) {
+    const left = x >= bpp ? orig[x - bpp] : 0;
+    const up = above ? above[x] : 0;
+    const ul = x >= bpp && above ? above[x - bpp] : 0;
+    let v = orig[x];
+    if (filter === 1) v = (v - left) & 0xFF;
+    else if (filter === 2) v = (v - up) & 0xFF;
+    else if (filter === 3) v = (v - ((left + up) >> 1)) & 0xFF;
+    else if (filter === 4) {
+      const p = left + up - ul;
+      const pa = Math.abs(p - left), pb = Math.abs(p - up), pc = Math.abs(p - ul);
+      const pred = (pa <= pb && pa <= pc) ? left : (pb <= pc ? up : ul);
+      v = (v - pred) & 0xFF;
+    }
+    out[x] = v;
+  }
+  return out;
+}
+
+test('decode_png: round-trip on small scene (transparency preserved)', () => {
+  const s = mk(8, [
+    { id: 'a', type: 'fill', color: R },
+    { id: 'b', type: 'ellipse', cx: 4, cy: 4, rx: 3, ry: 2, color: B }
+  ]);
+  PE.set_pixel(s, 0, 0, null); // transparent hole
+  const dec = PE.decode_png(PE.encode_png(s));
+  assert.strictEqual(dec.width, 8);
+  assert.strictEqual(dec.height, 8);
+  assert.deepStrictEqual(dec.rgba, PE.rasterize(s));
+});
+
+test('decode_png: round-trip on hash-locked benchmark assets', () => {
+  for (const name of ['coin16', 'chest32', 'character64', 'creature64']) {
+    const s = loadScene(name);
+    const dec = PE.decode_png(PE.encode_png(s));
+    assert.strictEqual(dec.width, s.size, name);
+    assert.strictEqual(dec.height, s.size, name);
+    assert.deepStrictEqual(dec.rgba, PE.rasterize(s), name);
+  }
+});
+
+test('decode_png: RGB (color type 2) -> alpha 255', () => {
+  const w = 4, h = 3;
+  const stride = w * 3 + 1;
+  const raw = Buffer.alloc(h * stride);
+  for (let y = 0; y < h; y++) {
+    raw[y * stride] = 0;
+    for (let x = 0; x < w; x++) {
+      raw[y * stride + 1 + x * 3] = x * 50;
+      raw[y * stride + 1 + x * 3 + 1] = y * 50;
+      raw[y * stride + 1 + x * 3 + 2] = 100;
+    }
+  }
+  const dec = PE.decode_png(buildPNG(w, h, 2, raw));
+  assert.strictEqual(dec.width, w);
+  assert.strictEqual(dec.height, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const d = (y * w + x) * 4;
+    assert.strictEqual(dec.rgba[d], x * 50);
+    assert.strictEqual(dec.rgba[d + 1], y * 50);
+    assert.strictEqual(dec.rgba[d + 2], 100);
+    assert.strictEqual(dec.rgba[d + 3], 255);
+  }
+});
+
+test('decode_png: palette (color type 3) with tRNS alpha', () => {
+  const w = 3, h = 2;
+  const plte = Buffer.from([255, 0, 0, 0, 255, 0, 10, 20, 30]);
+  const trns = Buffer.from([255, 128, 0]);
+  const raw = Buffer.alloc(h * (w + 1));
+  for (let y = 0; y < h; y++) {
+    raw[y * (w + 1)] = 0;
+    for (let x = 0; x < w; x++) raw[y * (w + 1) + 1 + x] = (x + y) % 3;
+  }
+  const dec = PE.decode_png(buildPNG(w, h, 3, raw, plte, trns));
+  assert.deepStrictEqual(Array.from(dec.rgba), [
+    255, 0, 0, 255, 0, 255, 0, 128, 10, 20, 30, 0,
+    0, 255, 0, 128, 10, 20, 30, 0, 255, 0, 0, 255
+  ]);
+});
+
+test('decode_png: all 5 filter types reconstructed', () => {
+  const w = 4, h = 5, bpp = 4;
+  const rows = [];
+  for (let y = 0; y < h; y++) {
+    const row = Buffer.alloc(w * bpp);
+    for (let x = 0; x < w; x++) {
+      row[x * bpp] = (x * 37 + y * 11) & 0xFF;
+      row[x * bpp + 1] = (x * 3 + y * 53) & 0xFF;
+      row[x * bpp + 2] = (x * y + 17) & 0xFF;
+      row[x * bpp + 3] = 255;
+    }
+    rows.push(row);
+  }
+  const raw = Buffer.alloc(h * (w * bpp + 1));
+  for (let y = 0; y < h; y++) {
+    raw[y * (w * bpp + 1)] = y % 5; // filters 0..4 across rows
+    filterRow(rows[y], y > 0 ? rows[y - 1] : null, y % 5, bpp).copy(raw, y * (w * bpp + 1) + 1);
+  }
+  const dec = PE.decode_png(buildPNG(w, h, 6, raw));
+  const expected = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) expected.set(rows[y], y * w * bpp);
+  assert.deepStrictEqual(dec.rgba, expected);
+});
+
+test('decode_png: non-PNG input rejected', () => {
+  assert.throws(() => PE.decode_png(Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8])), /not a PNG/);
+});
+
+test('decode_png: truncated input rejected', () => {
+  const png = PE.encode_png(mk(4, [{ id: 'a', type: 'fill', color: R }]));
+  assert.throws(() => PE.decode_png(png.subarray(0, png.length - 5)), /truncated|corrupt/);
+});
+
+test('decode_png: corrupt chunk CRC rejected', () => {
+  const png = Buffer.from(PE.encode_png(mk(4, [{ id: 'a', type: 'fill', color: R }])));
+  png[12] ^= 0xFF; // flip a byte inside IHDR data
+  assert.throws(() => PE.decode_png(png), /corrupt chunk CRC/);
+});
+
+test('decode_png: corrupt compressed data rejected (fresh CRC, bad inflate)', () => {
+  const png = PE.encode_png(mk(4, [{ id: 'a', type: 'fill', color: R }]));
+  const idat = parsePNG(png).find(c => c.type === 'IDAT');
+  const bad = Buffer.from(idat.data);
+  bad[3] ^= 0xFF;
+  const rebuilt = Buffer.concat([
+    png.subarray(0, 33), // signature + IHDR chunk
+    pngChunk('IDAT', bad),
+    pngChunk('IEND', Buffer.alloc(0))
+  ]);
+  assert.throws(() => PE.decode_png(rebuilt), /corrupt/);
+});
+
+test('decode_png: unsupported IHDR variants rejected', () => {
+  const mkIhdr = (bitDepth, colorType, interlace) => {
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(4, 0);
+    ihdr.writeUInt32BE(4, 4);
+    ihdr[8] = bitDepth;
+    ihdr[9] = colorType;
+    ihdr[12] = interlace;
+    return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), pngChunk('IHDR', ihdr)]);
+  };
+  assert.throws(() => PE.decode_png(mkIhdr(4, 6, 0)), /bit depth/);
+  assert.throws(() => PE.decode_png(mkIhdr(8, 6, 1)), /interlaced/);
+  assert.throws(() => PE.decode_png(mkIhdr(8, 0, 0)), /color type/);
+});
+
+test('decode_png: palette image without PLTE rejected', () => {
+  const w = 2, h = 2;
+  const raw = Buffer.alloc(h * (w + 1));
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 3;
+  const png = Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', zlib.deflateSync(raw)),
+    pngChunk('IEND', Buffer.alloc(0))
+  ]);
+  assert.throws(() => PE.decode_png(png), /PLTE/);
+});
+
+// --- palette quantization (quantize_palette) --------------------------------
+
+function rgbaOf(width, height, fn) {
+  const buf = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const c = fn(x, y);
+    const d = (y * width + x) * 4;
+    if (c === null) { buf[d + 3] = 0; continue; }
+    buf[d] = c[0]; buf[d + 1] = c[1]; buf[d + 2] = c[2]; buf[d + 3] = 255;
+  }
+  return buf;
+}
+
+const hexToRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const sqDist = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+
+test('quantize_palette: exact palette when unique colors fit', () => {
+  const buf = rgbaOf(4, 2, (x) => {
+    if (x < 2) return [255, 0, 0];
+    if (x === 2) return [0, 255, 0];
+    return [10, 20, 30];
+  });
+  const q = PE.quantize_palette(buf, 16);
+  assert.deepStrictEqual(q.palette, ['#00ff00', '#0a141e', '#ff0000']); // sorted by r,g,b
+  assert.deepStrictEqual(Array.from(q.indices), [2, 2, 0, 1, 2, 2, 0, 1]);
+});
+
+test('quantize_palette: count cap respected (median-cut)', () => {
+  const buf = rgbaOf(16, 1, (x) => [x * 16, 255 - x * 16, x * 8]);
+  const q = PE.quantize_palette(buf, 8);
+  assert.strictEqual(q.palette.length, 8);
+  assert.strictEqual(q.indices.length, 16);
+  for (const i of q.indices) assert.ok(i >= 0 && i < 8);
+  for (let x = 0; x < 16; x++) {
+    const rgb = [x * 16, 255 - x * 16, x * 8];
+    const p = hexToRgb(q.palette[q.indices[x]]);
+    let bestD = Infinity;
+    for (const hex of q.palette) {
+      const d = sqDist(rgb, hexToRgb(hex));
+      if (d < bestD) bestD = d;
+    }
+    assert.strictEqual(sqDist(rgb, p), bestD, 'pixel ' + x + ' maps to nearest entry');
+  }
+});
+
+test('quantize_palette: determinism', () => {
+  const buf = rgbaOf(8, 8, (x, y) => [(x * 31 + y * 7) % 256, (x * 5 + y * 47) % 256, (x * y + 13) % 256]);
+  const a = PE.quantize_palette(buf, 12);
+  const b = PE.quantize_palette(buf, 12);
+  assert.deepStrictEqual(a.palette, b.palette);
+  assert.deepStrictEqual(Array.from(a.indices), Array.from(b.indices));
+});
+
+test('quantize_palette: fully transparent input -> empty palette', () => {
+  const q = PE.quantize_palette(new Uint8Array(4 * 4), 16);
+  assert.deepStrictEqual(q.palette, []);
+  assert.deepStrictEqual(Array.from(q.indices), [-1, -1, -1, -1]);
+});
+
+test('quantize_palette: transparent pixels map to -1', () => {
+  const buf = rgbaOf(2, 2, (x, y) => (x === 1 && y === 1) ? null : [255, 0, 0]);
+  const q = PE.quantize_palette(buf, 16);
+  assert.deepStrictEqual(q.palette, ['#ff0000']);
+  assert.deepStrictEqual(Array.from(q.indices), [0, 0, 0, -1]);
+});
+
+test('quantize_palette: bad maxColors rejected', () => {
+  const buf = rgbaOf(1, 1, () => [1, 2, 3]);
+  assert.throws(() => PE.quantize_palette(buf, 0), /positive integer/);
+  assert.throws(() => PE.quantize_palette(buf, 1.5), /positive integer/);
+});
+
+test('quantize_palette: default maxColors is 16', () => {
+  const buf = rgbaOf(32, 1, (x) => [x * 8, x * 8, x * 8]);
+  assert.strictEqual(PE.quantize_palette(buf).palette.length, 16);
+});
+
+test('quantize_palette: median-cut splits into cluster means', () => {
+  const buf = rgbaOf(8, 8, (x, y) => (y < 4 ? [200, 50, 50] : [50, 50, 200]));
+  const q = PE.quantize_palette(buf, 2);
+  assert.deepStrictEqual(q.palette, ['#3232c8', '#c83232']);
+  assert.strictEqual(q.indices[0], 1);
+  assert.strictEqual(q.indices[32], 0);
+});
+
+// --- scene validation (validate_scene) --------------------------------------
+
+function mkValidScene(size) {
+  return {
+    size: size,
+    palette: { a: '#111111', b: '#222222', c: '#333333', d: '#444444', e: '#555555' },
+    layers: [
+      { id: 'bg', type: 'fill', color: 'a' },
+      { id: 'r', type: 'rect', x: 1, y: 1, w: 2, h: 2, color: 'b' },
+      { id: 'el', type: 'ellipse', cx: 6, cy: 6, rx: 2, ry: 2, color: 'c' },
+      { id: 'p', type: 'poly', points: [[2, 8], [5, 8], [4, 10]], color: 'd' }
+    ],
+    pixels: { '0,0': 'e', '3,4': null }
+  };
+}
+
+test('validate_scene: valid small scene passes', () => {
+  const r = PE.validate_scene(mkValidScene(16));
+  assert.strictEqual(r.valid, true);
+  assert.deepStrictEqual(r.errors, []);
+});
+
+test('validate_scene: hash-locked assets pass', () => {
+  for (const name of ['house', 'robot', 'coin16', 'potion16', 'sword16', 'axe32', 'chest32',
+                      'torch32', 'sword64', 'axe64', 'creature64', 'character64']) {
+    const r = PE.validate_scene(loadScene(name));
+    assert.strictEqual(r.valid, true, name + ': ' + JSON.stringify(r.errors));
+  }
+});
+
+test('validate_scene: size errors are specific', () => {
+  const s = mkValidScene(16);
+  delete s.size;
+  assert.deepStrictEqual(PE.validate_scene(s).errors, ['size must be a positive integer']);
+  const s2 = mkValidScene(16);
+  s2.size = 24;
+  assert.deepStrictEqual(PE.validate_scene(s2).errors,
+    ['size must be one of the ladder sizes: 16, 32, 64, 128, 256 (got 24)']);
+});
+
+test('validate_scene: palette errors are specific', () => {
+  const s = mkValidScene(16);
+  delete s.palette;
+  assert.deepStrictEqual(PE.validate_scene(s).errors, ['palette must be an object']);
+  const s2 = mkValidScene(16);
+  delete s2.palette.e;
+  s2.pixels['0,0'] = 'd';
+  assert.deepStrictEqual(PE.validate_scene(s2).errors, ['palette must have 5-12 entries (got 4)']);
+  const s3 = mkValidScene(16);
+  s3.palette.f = 'not-a-color';
+  const r3 = PE.validate_scene(s3);
+  assert.ok(r3.errors.some(function (e) { return e === 'palette entry "f" has invalid color "not-a-color"'; }));
+});
+
+test('validate_scene: layer errors are specific', () => {
+  const s = mkValidScene(16);
+  s.layers[1].type = 'blob';
+  assert.deepStrictEqual(PE.validate_scene(s).errors, ['layer 1 has unknown type "blob"']);
+  const s2 = mkValidScene(16);
+  s2.layers[1].color = 'zzz';
+  assert.deepStrictEqual(PE.validate_scene(s2).errors,
+    ['layer 1 (rect) has unknown color "zzz"']);
+  const s3 = mkValidScene(16);
+  s3.layers[1].w = 0;
+  assert.deepStrictEqual(PE.validate_scene(s3).errors, ['layer 1 (rect) w must be >= 1']);
+  const s4 = mkValidScene(16);
+  s4.layers[1].x = -1;
+  assert.deepStrictEqual(PE.validate_scene(s4).errors, ['layer 1 (rect) x/y must be >= 0']);
+  const s5 = mkValidScene(16);
+  s5.layers[1].x = 15;
+  assert.deepStrictEqual(PE.validate_scene(s5).errors, ['layer 1 (rect) x + w / y + h exceed size 16']);
+  const s6 = mkValidScene(16);
+  s6.layers[2].rx = 0;
+  assert.deepStrictEqual(PE.validate_scene(s6).errors, ['layer 2 (ellipse) rx must be >= 1']);
+  const s7 = mkValidScene(16);
+  s7.layers[2].cx = 15;
+  assert.deepStrictEqual(PE.validate_scene(s7).errors, ['layer 2 (ellipse) ellipse out of bounds for size 16']);
+  const s8 = mkValidScene(16);
+  s8.layers[1].type = 'line';
+  s8.layers[1].x1 = 0; s8.layers[1].y1 = 0; s8.layers[1].x2 = 3; s8.layers[1].y2 = 99;
+  assert.deepStrictEqual(PE.validate_scene(s8).errors, ['layer 1 (line) endpoints out of bounds for size 16']);
+  const s9 = mkValidScene(16);
+  s9.layers[3].points = [[2, 8], [5, 8]];
+  assert.deepStrictEqual(PE.validate_scene(s9).errors,
+    ['layer 3 (poly) points must be an array of at least 3 [x, y] pairs']);
+  const s10 = mkValidScene(16);
+  s10.layers[3].points = [[2, 8], [5, 8], [40, 10]];
+  assert.deepStrictEqual(PE.validate_scene(s10).errors, ['layer 3 (poly) point 2 out of bounds for size 16']);
+  const s11 = mkValidScene(16);
+  s11.layers[1].type = 'rectout';
+  s11.layers[1].t = 0;
+  assert.deepStrictEqual(PE.validate_scene(s11).errors, ['layer 1 (rectout) t must be a positive integer']);
+});
+
+test('validate_scene: pixel errors are specific', () => {
+  const s = mkValidScene(16);
+  s.pixels['a,b'] = 'e';
+  assert.deepStrictEqual(PE.validate_scene(s).errors, ['pixel key "a,b" must be "x,y"']);
+  const s2 = mkValidScene(16);
+  s2.pixels['20,1'] = 'e';
+  assert.deepStrictEqual(PE.validate_scene(s2).errors, ['pixel "20,1" is out of bounds for size 16']);
+  const s3 = mkValidScene(16);
+  s3.pixels['0,0'] = 'zzz';
+  assert.deepStrictEqual(PE.validate_scene(s3).errors, ['pixel "0,0" has invalid value "zzz"']);
+});
+
+test('validate_scene: multiple errors collected, not stopped at', () => {
+  const s = mkValidScene(16);
+  s.size = 24;
+  s.layers[1].type = 'blob';
+  s.pixels['a,b'] = 'e';
+  const r = PE.validate_scene(s);
+  assert.strictEqual(r.valid, false);
+  assert.deepStrictEqual(r.errors, [
+    'size must be one of the ladder sizes: 16, 32, 64, 128, 256 (got 24)',
+    'layer 1 has unknown type "blob"',
+    'pixel key "a,b" must be "x,y"'
+  ]);
+});
+
+test('validate_scene: non-object input rejected', () => {
+  assert.deepStrictEqual(PE.validate_scene(null).errors, ['scene must be an object']);
+  assert.deepStrictEqual(PE.validate_scene([1, 2]).errors, ['scene must be an object']);
 });
 
 // ---------------------------------------------------------------------------
@@ -1310,6 +2432,61 @@ test('ball.json: palette drift empty, keyframes locked, frame-3 mirrors frame-1'
   );
 });
 
+test('campfire.json: per-frame rasterize hashes locked (64x64, 8 frames)', () => {
+  const a = loadAnim('campfire');
+  assert.strictEqual(a.width, 64);
+  assert.strictEqual(a.height, 64);
+  assert.strictEqual(a.fps, 8);
+  assert.strictEqual(a.frames.length, 8);
+  const hashes = PA.frame_ids(a).map(function (id) { return hash256(PA.resolve_frame(a, id)); });
+  assert.deepStrictEqual(hashes, [
+    '4aff077bb5c558183045e7ad80d1ada37889da9f5abe846f01bd66fd72bd1e51',
+    '830dfb52af0f7fa7d08d1c5f858b0ccf66ba9da2cf201e41f6219ef1ca4493b0',
+    'b714fe86f2106184dd4322cd2a44b0600ffbf5928acd0a4b0fa5c8b514e130e3',
+    'd0436a5edfd2cfcbaf2e6b3843f7915b095c64a495041da57330d7e95d6abe51',
+    '18da737d66db0f567ab390cda431b395575d1a04ce3feabfd9dbe6b149a46b06',
+    'e48bf3d371323e317d9c4c6b3aff4ce2b9a6fa02a7200b878cc5ba22265e928a',
+    '4ed1293ab50399b4f3af11756a71907637e308c6dd56c5a9f3251aad62d27e6f',
+    'b95dd628e96305ea69c126ff1ea135044e63a23546ff355afa9ce4d61b8080aa'
+  ]);
+});
+
+test('campfire.json: consecutive diffs localized to flame region, loop closes', () => {
+  const a = loadAnim('campfire');
+  const ids = PA.frame_ids(a);
+  const expected = [153, 263, 307, 144, 204, 234, 174];
+  for (let i = 0; i < expected.length; i++) {
+    const d = PA.diff_frames(a, ids[i], ids[i + 1]);
+    assert.strictEqual(d.changed_pixels, expected[i]);
+    const v = PA.validate_change(a, ids[i], ids[i + 1], [16, 3, 32, 53]);
+    assert.strictEqual(v.pass, true);
+    assert.strictEqual(v.unexpected_changes, 0);
+  }
+  const loop = PA.diff_frames(a, 'frame-7', 'frame-0');
+  assert.strictEqual(loop.changed_pixels, 44);
+  assert.deepStrictEqual(loop.bounding_box, [25, 16, 15, 29]);
+});
+
+test('campfire.json: spritesheet locked (512x64, hash)', () => {
+  const a = loadAnim('campfire');
+  const sheet = Buffer.from(PA.encode_spritesheet(a));
+  assert.strictEqual(sheet.readUInt32BE(16), 512);
+  assert.strictEqual(sheet.readUInt32BE(20), 64);
+  assert.strictEqual(sheet.length, 6883);
+  assert.strictEqual(hash256(sheet), '72027b2aed470aab29d57d65a99fd5c79e3d9acb509f0b8e662d232fb0a17b86');
+});
+
+test('campfire.json: palette drift empty, keyframes locked, 12 palette keys all painted', () => {
+  const a = loadAnim('campfire');
+  assert.deepStrictEqual(PA.palette_drift(a), []);
+  assert.deepStrictEqual(a.keyframes, { 'frame-0': true });
+  assert.strictEqual(Object.keys(a.palette).length, 12);
+  for (const id of PA.frame_ids(a)) {
+    const fp = PA.frame_palette(a, id);
+    assert.strictEqual(Object.keys(fp.colors).length, 12);
+  }
+});
+
 test('cli anim: diff + validate + ascii on ball.json', () => {
   const out = runCli(['anim', 'animations/ball.json', '--diff', 'frame-0,frame-1',
     '--validate', 'frame-0,frame-2,5,2,7,11', '--ascii', 'frame-0']);
@@ -1429,6 +2606,334 @@ test('encode_spritesheet: invalid columns rejected', () => {
   assert.throws(() => PA.encode_spritesheet(a, { columns: 1.5 }), /columns/);
 });
 
+// --- APNG export ------------------------------------------------------------
+
+/** Inflated filter-0 raw streams, one per frame, in APNG play order. */
+function apngFrameRaw(png) {
+  const chunks = parsePNG(png);
+  const raws = [];
+  for (const c of chunks) {
+    if (c.type === 'IDAT') raws.push(zlib.inflateSync(c.data));
+    if (c.type === 'fdAT') raws.push(zlib.inflateSync(c.data.subarray(4)));
+  }
+  return raws;
+}
+
+function rawOfFrame(anim, id) {
+  const buf = PA.resolve_frame(anim, id);
+  const size = anim.width;
+  const stride = size * 4 + 1;
+  const raw = Buffer.alloc(stride * size);
+  for (let y = 0; y < size; y++) {
+    raw[y * stride] = 0;
+    Buffer.from(buf.subarray(y * size * 4, (y + 1) * size * 4)).copy(raw, y * stride + 1);
+  }
+  return raw;
+}
+
+test('encode_apng: chunk structure (acTL/fcTL/fdAT, counts, sequence numbers)', () => {
+  const { a } = mkBallAnim();
+  PA.add_frame(a);
+  const chunks = parsePNG(PA.encode_apng(a));
+  assert.deepStrictEqual(chunks.map(c => c.type),
+    ['IHDR', 'acTL', 'fcTL', 'IDAT', 'fcTL', 'fdAT', 'IEND']);
+  assert.strictEqual(chunks[1].data.readUInt32BE(0), 2); // num_frames
+  assert.strictEqual(chunks[1].data.readUInt32BE(4), 0); // num_plays (infinite)
+  const fctl0 = chunks[2].data, fctl1 = chunks[4].data;
+  assert.strictEqual(fctl0.readUInt32BE(0), 0); // fcTL sequence 0
+  assert.strictEqual(fctl1.readUInt32BE(0), 1); // fcTL sequence 1
+  assert.strictEqual(chunks[5].data.readUInt32BE(0), 2); // fdAT sequence 2
+  assert.strictEqual(fctl0.readUInt32BE(4), 16); // frame width
+  assert.strictEqual(fctl0.readUInt32BE(8), 16); // frame height
+  assert.strictEqual(fctl0.readUInt32BE(12), 0); // x offset
+  assert.strictEqual(fctl0.readUInt32BE(16), 0); // y offset
+  assert.strictEqual(fctl0.readUInt16BE(20), 1); // delay_num
+  assert.strictEqual(fctl0.readUInt16BE(22), 8); // delay_den = fps
+  assert.strictEqual(fctl0[24], 0); // dispose_op: none
+  assert.strictEqual(fctl0[25], 0); // blend_op: source
+});
+
+test('encode_apng: frame extraction round-trip (decode our own APNG)', () => {
+  const { a, f0 } = mkBallAnim();
+  const f1 = PA.add_frame(a);
+  PA.set_frame_pixel(a, f1, 5, 5, 'ball');
+  const raws = apngFrameRaw(PA.encode_apng(a));
+  assert.strictEqual(raws.length, 2);
+  assert.deepStrictEqual(raws[0], rawOfFrame(a, f0));
+  assert.deepStrictEqual(raws[1], rawOfFrame(a, f1));
+});
+
+test('encode_apng: determinism (two encodes identical bytes)', () => {
+  const { a } = mkBallAnim();
+  PA.add_frame(a);
+  assert.deepStrictEqual(Buffer.from(PA.encode_apng(a)), Buffer.from(PA.encode_apng(a)));
+});
+
+test('encode_apng: single frame -> valid APNG with one frame, no fdAT', () => {
+  const { a } = mkBallAnim();
+  const chunks = parsePNG(PA.encode_apng(a));
+  assert.deepStrictEqual(chunks.map(c => c.type),
+    ['IHDR', 'acTL', 'fcTL', 'IDAT', 'IEND']);
+  assert.strictEqual(chunks[1].data.readUInt32BE(0), 1);
+});
+
+test('encode_apng: empty animation rejected', () => {
+  const a = PA.create_animation(16, 16);
+  assert.throws(() => PA.encode_apng(a), /no frames/);
+});
+
+test('encode_apng: loop + fps opts (defaults 0 = infinite, anim.fps)', () => {
+  const { a } = mkBallAnim();
+  PA.add_frame(a);
+  const chunks = parsePNG(PA.encode_apng(a, { loop: 3, fps: 12 }));
+  assert.strictEqual(chunks[1].data.readUInt32BE(4), 3);
+  assert.strictEqual(chunks[2].data.readUInt16BE(22), 12);
+});
+
+test('export_apng: writes a valid APNG file', () => {
+  const { a } = mkBallAnim();
+  PA.add_frame(a);
+  const tmp = path.join(os.tmpdir(), 'pe-test-' + process.pid + '.apng');
+  try {
+    PA.export_apng(a, tmp);
+    const data = fs.readFileSync(tmp);
+    assert.deepStrictEqual(data, Buffer.from(PA.encode_apng(a)));
+    assert.strictEqual(parsePNG(data).map(c => c.type).includes('acTL'), true);
+  } finally {
+    fs.unlinkSync(tmp);
+  }
+});
+
+// --- GIF export -------------------------------------------------------------
+
+function mkTwoFrameAnim() {
+  const { a, f0 } = mkBallAnim();
+  const f1 = PA.add_frame(a);
+  PA.set_frame_pixel(a, f1, 4, 4, 'ball');
+  return { a: a, f0: f0, f1: f1 };
+}
+
+function mkTransparentAnim() {
+  const a = PA.create_animation(8, 8, { fps: 8 });
+  const f0 = PA.add_frame(a);
+  a.palette.ball = '#E94560';
+  PA.set_frame_pixel(a, f0, 1, 1, 'ball');
+  return { a: a, f0: f0 };
+}
+
+/** Minimal GIF89a reader: header/LSD/GCT/GCE/image-descriptor/trailer + LZW decode. */
+function parseGIF(bytes) {
+  const buf = Buffer.from(bytes);
+  assert.strictEqual(buf.toString('ascii', 0, 6), 'GIF89a', 'GIF header');
+  const width = buf.readUInt16LE(6);
+  const height = buf.readUInt16LE(8);
+  const packed = buf[10];
+  assert.notStrictEqual(packed & 0x80, 0, 'GCT flag set');
+  const gctSize = packed & 7;
+  const gctEntries = 1 << (gctSize + 1);
+  let pos = 13;
+  const palette = [];
+  for (let i = 0; i < gctEntries; i++) {
+    palette.push([buf[pos], buf[pos + 1], buf[pos + 2]]);
+    pos += 3;
+  }
+  let transparentIndex = -1;
+  let loop = null;
+  let pendingDelay = 0;
+  const frames = [];
+  while (pos < buf.length) {
+    const b = buf[pos++];
+    if (b === 0x3B) break; // trailer
+    if (b === 0x21) {
+      const label = buf[pos++];
+      if (label === 0xFF) { // application extension (Netscape loop)
+        const size = buf[pos++];
+        const app = buf.toString('ascii', pos, pos + size);
+        pos += size;
+        if (app === 'NETSCAPE2.0') {
+          const subSize = buf[pos++];
+          if (buf[pos] === 0x01) loop = buf.readUInt16LE(pos + 1);
+          pos += subSize;
+        }
+        pos++; // block terminator
+      } else if (label === 0xF9) { // graphic control extension
+        assert.strictEqual(buf[pos++], 4, 'GCE block size');
+        const gpacked = buf[pos++];
+        pendingDelay = buf.readUInt16LE(pos);
+        pos += 2;
+        const tIndex = buf[pos++];
+        pos++; // terminator
+        if (gpacked & 1) transparentIndex = tIndex;
+      } else {
+        let sz = buf[pos++];
+        while (sz !== 0) { pos += sz; sz = buf[pos++]; }
+      }
+    } else if (b === 0x2C) { // image descriptor
+      pos += 8; // left/top/width/height
+      const ipacked = buf[pos++];
+      assert.strictEqual(ipacked & 0x80, 0, 'no local color table');
+      const minCodeSize = buf[pos++];
+      const data = [];
+      let sz = buf[pos++];
+      while (sz !== 0) {
+        for (let i = 0; i < sz; i++) data.push(buf[pos + i]);
+        pos += sz;
+        sz = buf[pos++];
+      }
+      frames.push({ pixels: gifLzwDecode(Uint8Array.from(data), minCodeSize), delay: pendingDelay });
+      pendingDelay = 0;
+    } else {
+      throw new Error('unexpected GIF byte 0x' + b.toString(16) + ' at offset ' + (pos - 1));
+    }
+  }
+  return { width: width, height: height, palette: palette, transparentIndex: transparentIndex, loop: loop, frames: frames };
+}
+
+/** Canonical GIF LZW decoder (clear/EOI, KwKwK case, code-size growth at 2^codeSize). */
+function gifLzwDecode(data, minCodeSize) {
+  const clear = 1 << minCodeSize;
+  const eoi = clear + 1;
+  let codeSize = minCodeSize + 1;
+  let nextCode = eoi + 1;
+  let dict = new Map();
+  for (let i = 0; i < clear; i++) dict.set(i, [i]);
+  const out = [];
+  let pos = 0, bitBuf = 0, bitCnt = 0;
+  const readCode = function () {
+    while (bitCnt < codeSize) {
+      bitBuf |= data[pos++] << bitCnt;
+      bitCnt += 8;
+    }
+    const c = bitBuf & ((1 << codeSize) - 1);
+    bitBuf >>>= codeSize;
+    bitCnt -= codeSize;
+    return c;
+  };
+  let code = readCode();
+  if (code !== clear) throw new Error('LZW stream must start with a clear code');
+  let prev = null;
+  while (true) {
+    code = readCode();
+    if (code === eoi) break;
+    if (code === clear) {
+      codeSize = minCodeSize + 1;
+      nextCode = eoi + 1;
+      dict = new Map();
+      for (let i = 0; i < clear; i++) dict.set(i, [i]);
+      prev = null;
+      continue;
+    }
+    let entry;
+    if (dict.has(code)) entry = dict.get(code);
+    else if (code === nextCode) entry = dict.get(prev).concat(dict.get(prev)[0]);
+    else throw new Error('bad LZW code ' + code + ' (next ' + nextCode + ')');
+    for (const v of entry) out.push(v);
+    if (prev !== null) {
+      dict.set(nextCode, dict.get(prev).concat(entry[0]));
+      nextCode++;
+      if (nextCode === (1 << codeSize) && codeSize < 12) codeSize++;
+    }
+    prev = code;
+  }
+  return out;
+}
+
+function gifFrameRgba(g, frameIndex, width, height) {
+  const rgba = new Uint8Array(width * height * 4);
+  const px = g.frames[frameIndex].pixels;
+  assert.strictEqual(px.length, width * height, 'pixel count');
+  for (let i = 0; i < px.length; i++) {
+    const idx = px[i];
+    if (idx === g.transparentIndex) continue;
+    const c = g.palette[idx];
+    rgba[i * 4] = c[0];
+    rgba[i * 4 + 1] = c[1];
+    rgba[i * 4 + 2] = c[2];
+    rgba[i * 4 + 3] = 255;
+  }
+  return rgba;
+}
+
+test('encode_gif: structure (header/LSD/GCT/GCE/descriptor/trailer)', () => {
+  const { a } = mkBallAnim();
+  PA.add_frame(a);
+  const g = parseGIF(PA.encode_gif(a));
+  assert.strictEqual(g.width, 16);
+  assert.strictEqual(g.height, 16);
+  assert.strictEqual(g.loop, 0); // default: infinite
+  assert.strictEqual(g.transparentIndex, -1); // fully opaque animation
+  assert.strictEqual(g.frames.length, 2);
+  assert.strictEqual(g.frames[0].delay, 13); // round(100/8)
+  const hexes = g.palette.map(c => '#' + [c[0], c[1], c[2]].map(v => ('0' + v.toString(16)).slice(-2)).join(''));
+  assert.ok(hexes.includes('#1a1a2e')); // bg
+  assert.ok(hexes.includes('#e94560')); // ball
+});
+
+test('encode_gif: pixel round-trip (decode our own GIF)', () => {
+  const { a, f0, f1 } = mkTwoFrameAnim();
+  const g = parseGIF(PA.encode_gif(a));
+  assert.strictEqual(g.frames.length, 2);
+  assert.deepStrictEqual(gifFrameRgba(g, 0, 16, 16), PA.resolve_frame(a, f0));
+  assert.deepStrictEqual(gifFrameRgba(g, 1, 16, 16), PA.resolve_frame(a, f1));
+});
+
+test('encode_gif: transparency via GCE (transparent index)', () => {
+  const { a, f0 } = mkTransparentAnim();
+  const g = parseGIF(PA.encode_gif(a));
+  assert.ok(g.transparentIndex >= 0);
+  const rgba = gifFrameRgba(g, 0, 8, 8);
+  assert.deepStrictEqual(rgba, PA.resolve_frame(a, f0));
+  assert.strictEqual(rgba[3], 0); // (0,0) transparent
+  assert.strictEqual(rgba[(1 * 8 + 1) * 4 + 3], 255); // ball opaque
+});
+
+test('encode_gif: determinism (two encodes identical bytes)', () => {
+  const { a } = mkTwoFrameAnim();
+  assert.deepStrictEqual(Buffer.from(PA.encode_gif(a)), Buffer.from(PA.encode_gif(a)));
+});
+
+test('encode_gif: single frame -> one image descriptor', () => {
+  const { a } = mkBallAnim();
+  const g = parseGIF(PA.encode_gif(a));
+  assert.strictEqual(g.frames.length, 1);
+});
+
+test('encode_gif: empty animation rejected', () => {
+  const a = PA.create_animation(16, 16);
+  assert.throws(() => PA.encode_gif(a), /no frames/);
+});
+
+test('encode_gif: >256 unique colors rejected', () => {
+  const a = PA.create_animation(32, 32);
+  const f = PA.add_frame(a);
+  for (let i = 0; i < 257; i++) {
+    PA.set_frame_pixel(a, f, i % 32, Math.floor(i / 32), '#' + ('000000' + i.toString(16)).slice(-6));
+  }
+  assert.throws(() => PA.encode_gif(a), /256-color GIF limit/);
+});
+
+test('encode_gif: loop + fps opts', () => {
+  const { a } = mkBallAnim();
+  PA.add_frame(a);
+  const g = parseGIF(PA.encode_gif(a, { loop: 5, fps: 12 }));
+  assert.strictEqual(g.loop, 5);
+  assert.strictEqual(g.frames[0].delay, 8); // round(100/12)
+});
+
+test('export_gif: writes a valid GIF file', () => {
+  const { a } = mkBallAnim();
+  PA.add_frame(a);
+  const tmp = path.join(os.tmpdir(), 'pe-test-' + process.pid + '.gif');
+  try {
+    PA.export_gif(a, tmp);
+    const data = fs.readFileSync(tmp);
+    assert.deepStrictEqual(data, Buffer.from(PA.encode_gif(a)));
+    assert.strictEqual(data.toString('ascii', 0, 6), 'GIF89a');
+  } finally {
+    fs.unlinkSync(tmp);
+  }
+});
+
 test('animation_to_html: renders the seeded frame scene (palette added after frame)', () => {
   const a = PA.create_animation(4, 4);
   PA.add_frame(a);
@@ -1472,6 +2977,306 @@ test('animation_to_html: click-to-inspect reads the canvas (getImageData), not w
   const transparent = fn({ getImageData: function () { return { data: Uint8Array.from([0, 0, 0, 0]) }; } }, 16, 8, [{ id: 'frame-0' }], 0, stubDoc);
   transparent.call(stubCanvas, { clientX: 64, clientY: 40 });
   assert.strictEqual(info.textContent, 'frame frame-0 (8,5) -> transparent');
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — agent-loop tools (better "eyes")
+// ---------------------------------------------------------------------------
+
+test('diff_scenes: identical scenes -> 0 changed, null bbox, empty changes', () => {
+  const a = PE.create_canvas(8, '#111111');
+  PE.fill_region(a, 2, 2, 2, 2, '#ff0000');
+  const b = JSON.parse(JSON.stringify(a));
+  const d = PE.diff_scenes(a, b);
+  assert.strictEqual(d.changed, 0);
+  assert.strictEqual(d.unchanged, 64);
+  assert.strictEqual(d.pct, 0);
+  assert.strictEqual(d.bbox, null);
+  assert.deepStrictEqual(d.changes, []);
+  assert.strictEqual(d.changed_pixels, 0);
+  assert.strictEqual(d.bounding_box, null);
+});
+
+test('diff_scenes: single-pixel diff reports bbox + pct', () => {
+  const a = PE.create_canvas(4);
+  const b = PE.create_canvas(4);
+  PE.fill_region(a, 1, 1, 1, 1, '#ff0000');
+  PE.fill_region(b, 1, 1, 1, 1, '#00ff00');
+  const d = PE.diff_scenes(a, b);
+  assert.strictEqual(d.changed, 1);
+  assert.strictEqual(d.unchanged, 15);
+  assert.strictEqual(d.pct, 6.25);
+  assert.deepStrictEqual(d.bbox, [1, 1, 1, 1]);
+  assert.strictEqual(d.changes.length, 1);
+  assert.deepStrictEqual(d.changes[0], { x: 1, y: 1, old_value: '#ff0000', new_value: '#00ff00' });
+});
+
+test('diff_scenes: different sizes -> error', () => {
+  const a = PE.create_canvas(16);
+  const b = PE.create_canvas(32);
+  assert.throws(() => PE.diff_scenes(a, b), /size mismatch/);
+});
+
+test('diff_scenes: multi-pixel bbox spanning', () => {
+  const a = PE.create_canvas(8, '#000000');
+  const b = PE.create_canvas(8, '#000000');
+  PE.set_pixel(b, 1, 1, '#ff0000');
+  PE.set_pixel(b, 6, 6, '#ff0000');
+  const d = PE.diff_scenes(a, b);
+  assert.strictEqual(d.changed, 2);
+  assert.deepStrictEqual(d.bbox, [1, 1, 6, 6]);
+});
+
+test('replace_color_region: region-limited recolor', () => {
+  const s = PE.create_canvas(8, '#000000');
+  PE.fill_region(s, 0, 0, 8, 8, '#ff0000');
+  // Recolor only left half from red to blue
+  const r = PE.replace_color_region(s, 0, 0, 4, 8, '#ff0000', '#0000ff');
+  assert.strictEqual(r.replaced, 32);
+  assert.strictEqual(PE.get_pixel(s, 1, 1), '#0000ff');
+  assert.strictEqual(PE.get_pixel(s, 5, 5), '#ff0000');
+});
+
+test('replace_color_region: clipping at canvas edge', () => {
+  const s = PE.create_canvas(4, '#ff0000');
+  const r = PE.replace_color_region(s, 2, 2, 10, 10, '#ff0000', '#00ff00');
+  assert.strictEqual(r.replaced, 4);
+});
+
+test('replace_color_region: empty region and from===to are no-ops', () => {
+  const s = PE.create_canvas(4, '#ff0000');
+  assert.deepStrictEqual(PE.replace_color_region(s, 0, 0, 0, 4, '#ff0000', '#00ff00'), { replaced: 0 });
+  assert.deepStrictEqual(PE.replace_color_region(s, 0, 0, 4, 4, '#ff0000', '#ff0000'), { replaced: 0 });
+  const hex = '#112233';
+  const s2 = PE.create_canvas(4, hex);
+  assert.deepStrictEqual(PE.replace_color_region(s2, 0, 0, 4, 4, hex.toUpperCase(), hex.toLowerCase()), { replaced: 0 });
+});
+
+test('measure_distance: known distances', () => {
+  assert.strictEqual(PE.measure_distance(0, 0, 3, 4), 5);
+  assert.strictEqual(PE.measure_distance(0, 0, 0, 0), 0);
+  assert.ok(Math.abs(PE.measure_distance(1, 1, 4, 5) - 5) < 1e-9);
+  assert.ok(Math.abs(PE.measure_distance(-1, -1, 2, 3) - 5) < 1e-9);
+});
+
+test('check_symmetry: symmetric scene passes, asymmetric fails with diff list', () => {
+  const s = PE.create_canvas(8, '#000000');
+  PE.fill_region(s, 1, 2, 2, 2, '#ff0000');
+  PE.mirror_region(s, 1, 2, 2, 2, 'h');
+  // Mirror the left half to right half: now symmetric in region 1,2,4,2? Actually mirror writes right half
+  // Build symmetric explicitly: left block then mirror
+  const sym = PE.check_symmetry(s, 'h', { x: 1, y: 2, w: 4, h: 2 });
+  // After mirror_region with w=2, the 4-wide region should not be symmetric unless we check correctly
+  // Simpler: create symmetric scene directly
+  const t = PE.create_canvas(8);
+  PE.fill_region(t, 0, 0, 2, 2, '#ff0000');
+  PE.fill_region(t, 6, 0, 2, 2, '#ff0000');
+  const r = PE.check_symmetry(t, 'h', { x: 0, y: 0, w: 8, h: 2 });
+  assert.strictEqual(r.symmetric, true);
+  assert.strictEqual(r.diffCount, 0);
+  // Asymmetric: only left side
+  const u = PE.create_canvas(8);
+  PE.fill_region(u, 0, 0, 2, 2, '#ff0000');
+  const r2 = PE.check_symmetry(u, 'h', { x: 0, y: 0, w: 8, h: 2 });
+  assert.strictEqual(r2.symmetric, false);
+  assert.ok(r2.diffCount > 0);
+  assert.ok(Array.isArray(r2.diffPixels));
+});
+
+test('check_symmetry: empty region is vacuously symmetric, odd width center skipped, bad axis throws', () => {
+  const s = PE.create_canvas(4, '#ff0000');
+  assert.deepStrictEqual(PE.check_symmetry(s, 'h', { x: 0, y: 0, w: 0, h: 4 }), { symmetric: true, diffCount: 0, diffPixels: [] });
+  // Odd width: 5-wide region, center column 2 maps to itself -> skipped
+  const odd = PE.create_canvas(5);
+  PE.fill_region(odd, 0, 0, 2, 5, '#ff0000');
+  PE.fill_region(odd, 3, 0, 2, 5, '#ff0000');
+  // middle column empty, left and right symmetric
+  const ro = PE.check_symmetry(odd, 'h', { x: 0, y: 0, w: 5, h: 5 });
+  assert.strictEqual(ro.symmetric, true);
+  assert.throws(() => PE.check_symmetry(s, 'x'), /axis must be/);
+});
+
+test('dither_region: Bayer 4x4 gradient and determinism', () => {
+  const s = PE.create_canvas(8);
+  s.palette = { a: '#000000', b: '#ffffff' };
+  const r = PE.dither_region(s, 0, 0, 8, 1, { from: '#000000', to: '#ffffff' });
+  assert.strictEqual(r.dithered, 8);
+  const s2 = PE.create_canvas(8);
+  s2.palette = { a: '#000000', b: '#ffffff' };
+  PE.dither_region(s2, 0, 0, 8, 1, { from: '#000000', to: '#ffffff' });
+  assert.deepStrictEqual(s.pixels, s2.pixels);
+  assert.strictEqual(s.pixels['0,0'], '#000000');
+  assert.strictEqual(s.pixels['7,0'], '#ffffff');
+  const e = PE.create_canvas(4);
+  assert.deepStrictEqual(PE.dither_region(e, 0, 0, 0, 4, { from: '#000', to: '#fff' }), { dithered: 0 });
+  const f = PE.create_canvas(4);
+  assert.deepStrictEqual(PE.dither_region(f, 0, 0, 4, 4, { from: '#ff0000', to: '#ff0000' }), { dithered: 0 });
+});
+
+test('mcp: package exists with 20+ tools and expected names', () => {
+  const mcpPkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'mcp/package.json'), 'utf8'));
+  assert.strictEqual(mcpPkg.name, 'pixel-engine-mcp');
+  assert.ok(mcpPkg.dependencies['@modelcontextprotocol/sdk']);
+  const registry = require('../engine/tool-registry.js');
+  assert.ok(registry.length >= 20, 'expected 20+ tools, got ' + registry.length);
+  for (const name of ['render', 'diff_scenes', 'validate_scene', 'encode_png', 'check_symmetry', 'measure_distance']) {
+    assert.ok(registry.some(t => t.name === name), 'tool ' + name + ' missing in registry');
+  }
+  const mcpSrc = fs.readFileSync(path.join(ROOT, 'mcp/src/index.js'), 'utf8');
+  assert.ok(mcpSrc.includes('tool-registry'), 'MCP should import tool-registry');
+});
+
+test('registry: tool-registry is single source of truth for docs', () => {
+  const registry = require('../engine/tool-registry.js');
+  const api = fs.readFileSync(path.join(ROOT, 'skills/pixel-engine/references/api.md'), 'utf8');
+  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+  for (const t of registry) {
+    assert.ok(api.includes(t.name), `api.md missing tool ${t.name}`);
+    assert.ok(readme.includes(t.name) || readme.includes(t.name.replace('_', '-')), `README missing tool ${t.name}`);
+  }
+});
+
+test('registry: layer-registry matches engine compact codes', () => {
+  const reg = require('../engine/layer-registry.js');
+  const types = reg.listTypes();
+  assert.ok(types.length >= 8, 'expected 8 layer types');
+  for (const type of ['fill', 'rect', 'rectout', 'ellipse', 'line', 'poly', 'polyout', 'curve']) {
+    assert.ok(types.includes(type), `layer type ${type} missing in registry`);
+    assert.ok(reg.codeFor(type), `code for ${type} missing`);
+    assert.strictEqual(reg.typeFor(reg.codeFor(type)), type);
+  }
+});
+
+test('ci: workflow exists and runs npm test on 18/20/22', () => {
+  const yml = fs.readFileSync(path.join(ROOT, '.github/workflows/test.yml'), 'utf8');
+  assert.ok(yml.includes('npm test'));
+  assert.ok(yml.includes('18'));
+  assert.ok(yml.includes('20'));
+  assert.ok(yml.includes('22'));
+});
+
+test('release: script exists with dry-run support', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'scripts/release.js'), 'utf8');
+  assert.ok(src.includes('dry-run'));
+  assert.ok(src.includes('npm publish'));
+});
+
+// ---------------------------------------------------------------------------
+// Phase 5 — taste layer
+// ---------------------------------------------------------------------------
+
+test('compare_scene_to_reference: identical scene vs itself -> perfect scores', () => {
+  const s = JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes/craft/creature32.json'), 'utf8'));
+  const buf = PE.rasterize(s);
+  const m = PE.compare_scene_to_reference(s, buf);
+  assert.strictEqual(m.silhouetteIoU, 1);
+  assert.strictEqual(m.paletteDistance, 0);
+  assert.strictEqual(m.histogramDistance, 0);
+  assert.strictEqual(m.intersection, m.union);
+});
+
+test('compare_scene_to_reference: different scenes -> expected deltas (IoU <1, distances >0)', () => {
+  const a = JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes/craft/creature32.json'), 'utf8'));
+  const b = PE.create_canvas(32);
+  b.palette = { bg: '#000000' };
+  PE.fill_region(b, 0, 0, 32, 32, 'bg');
+  const bufB = PE.rasterize(b);
+  const m = PE.compare_scene_to_reference(a, bufB);
+  assert.ok(m.silhouetteIoU < 1 && m.silhouetteIoU > 0);
+  assert.ok(m.paletteDistance > 0);
+  assert.ok(m.histogramDistance > 0);
+});
+
+test('compare_scene_to_reference: auto-scales reference of different size', () => {
+  const s = PE.create_canvas(16);
+  s.palette = { red: '#ff0000' };
+  PE.fill_region(s, 0, 0, 16, 16, 'red');
+  const small = new Uint8Array(4 * 4 * 4);
+  for (let i = 0; i < small.length; i += 4) { small[i] = 255; small[i + 1] = 0; small[i + 2] = 0; small[i + 3] = 255; }
+  const m = PE.compare_scene_to_reference(s, { width: 4, height: 4, rgba: small });
+  assert.strictEqual(m.silhouetteIoU, 1);
+  assert.strictEqual(m.paletteDistance, 0);
+});
+
+test('compare_scene_to_reference: region limits comparison', () => {
+  const s = JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes/craft/creature32.json'), 'utf8'));
+  const buf = PE.rasterize(s);
+  const m = PE.compare_scene_to_reference(s, buf, { region: { x: 0, y: 0, w: 4, h: 4 } });
+  assert.deepStrictEqual(m.region, [0, 0, 4, 4]);
+});
+
+test('analyze_values: craft palette groups skin family with 3 steps', () => {
+  const s = JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes/craft/creature32.json'), 'utf8'));
+  const a = PE.analyze_values(s);
+  assert.strictEqual(a.families.skin.count, 3);
+  assert.deepStrictEqual(a.families.skin.keys, ['skinDark', 'skinMid', 'skinLight']);
+  assert.strictEqual(a.totalFamilies, 4);
+});
+
+test('check_hue_shift: craft palette passes, flat palette fails', () => {
+  const craft = { outline: '#22331A', skinDark: '#3A5A4E', skinMid: '#5E8F4E', skinLight: '#A8D878', belly: '#D8F0B8', eye: '#1A1A1A' };
+  const flat = { outline: '#1A1A1A', skinDark: '#4A7A3A', skinMid: '#6BA34F', skinLight: '#8FC46E', belly: '#C9E8A8', eye: '#1A1A1A' };
+  const pass = PE.check_hue_shift(craft);
+  assert.strictEqual(pass.pass, true);
+  const skin = pass.results.find(r => r.family === 'skin');
+  assert.strictEqual(skin.status, 'PASS');
+  const fail = PE.check_hue_shift(flat);
+  assert.strictEqual(fail.pass, false);
+  const skinFail = fail.results.find(r => r.family === 'skin');
+  assert.strictEqual(skinFail.status, 'FAIL');
+});
+
+test('check_hue_shift: single-key family passes with note', () => {
+  const r = PE.check_hue_shift({ solo: '#ff0000' });
+  assert.strictEqual(r.pass, true);
+  assert.strictEqual(r.results[0].note, 'single-key family — no shift possible');
+});
+
+// ---------------------------------------------------------------------------
+// Workflow token diet (001) — compact + patch
+// ---------------------------------------------------------------------------
+
+test('compact: house round-trip pixel-identical', () => {
+  const scenes = ['scenes/house.json', 'scenes/creature64.json', 'scenes/craft/creature32.json'].map(p => JSON.parse(fs.readFileSync(path.join(ROOT, p), 'utf8')));
+  for (const s of scenes) {
+    const c = PE.encode_compact(s);
+    const d = PE.decode_compact(c);
+    assert.strictEqual(hash256(PE.rasterize(s)), hash256(PE.rasterize(d)), 'raster mismatch');
+  }
+});
+
+test('compact: token saving >=30% on house', () => {
+  const s = JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes/house.json'), 'utf8'));
+  const c = PE.encode_compact(s);
+  assert.ok(JSON.stringify(c).length < JSON.stringify(s).length * 0.7, `compact ${JSON.stringify(c).length} not < 70% of verbose ${JSON.stringify(s).length}`);
+});
+
+test('patch: get_patch + apply_patch round-trip', () => {
+  const s = JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes/house.json'), 'utf8'));
+  const s2 = JSON.parse(JSON.stringify(s));
+  s2.layers[0].color = 'roof';
+  s2.pixels['0,0'] = 'sky';
+  const patch = PE.get_patch(s, s2);
+  const clone = JSON.parse(JSON.stringify(s));
+  PE.apply_patch(clone, patch);
+  assert.strictEqual(hash256(PE.rasterize(clone)), hash256(PE.rasterize(s2)));
+});
+
+test('patch is smaller than full scene', () => {
+  const s = JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes/house.json'), 'utf8'));
+  const s2 = JSON.parse(JSON.stringify(s));
+  s2.layers[1].color = 'roof';
+  s2.layers[2].color = 'sky';
+  const patch = PE.get_patch(s, s2);
+  assert.ok(JSON.stringify(patch).length < JSON.stringify(s2).length * 0.3, `patch ${JSON.stringify(patch).length} not <30% of full ${JSON.stringify(s2).length}`);
+});
+
+test('critic loop: craft scene passes taste, flat scene fails', () => {
+  const craft = JSON.parse(fs.readFileSync(path.join(ROOT, 'scenes/craft/creature32.json'), 'utf8'));
+  assert.strictEqual(PE.analyze_values(craft).families.skin.count, 3);
+  assert.strictEqual(PE.check_hue_shift(craft.palette).pass, true);
+  const flat = { outline: '#1A1A1A', skinDark: '#4A7A3A', skinMid: '#6BA34F', skinLight: '#8FC46E', belly: '#C9E8A8', eye: '#1A1A1A' };
+  assert.strictEqual(PE.check_hue_shift(flat).pass, false);
 });
 
 // ---------------------------------------------------------------------------

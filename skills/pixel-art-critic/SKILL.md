@@ -71,6 +71,13 @@ Aesthetic criteria that are still **provable from the document** — check them 
 
 A craft-pass FAIL is a HIGH defect (palette/lighting class) — fix before acceptance, but it is not a blocking FACT FAIL.
 
+Engine-verified craft checks (call these and report PASS/FAIL with evidence):
+- `analyze_values(scene)` → check `warnings` for value steps per family (expect 3–4, except single-key families like eye). Example: craft `skin` family should be 3 (skinDark/skinMid/skinLight) with no warnings.
+- `check_hue_shift(palette)` → must be `pass: true`; if FAIL, report which family and hue diff, e.g. `skin: highlight not hue-shifted (3.0°)` — fix palette hue before adding geometry.
+- `compare_scene_to_reference(scene, refRgba, { region })` if a reference image is available → `silhouetteIoU` should be >0.9, `paletteDistance` <20 for a craft palette; report the numbers.
+
+Run these after FACT checks pass, before ranking opinions. Each check is provable — include its JSON output as evidence.
+
 ## Severity
 
 - **CRITICAL** — structural breakage: silhouette merges, missing parts, wrong bounding box or margins. Must fix before acceptance.

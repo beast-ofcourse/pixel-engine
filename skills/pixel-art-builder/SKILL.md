@@ -11,10 +11,10 @@ Build pixel art as structured scene documents, not pixel by pixel. The engine ra
 
 The single most important construction decision is **which primitive fits the object's geometry**:
 
-- **Organic curved form** (creature, flame, leaf, cloth, horn, tail, head) → `poly` / `polyout` contour. Never a rectangle.
+- **Organic curved form** (creature, flame, leaf, cloth, horn, tail, head) → `curve` (smooth spline blob) or `poly` / `polyout` contour. Never a rectangle.
 - **Rectilinear form** (chest, building, platform, UI, mechanical block) → `rect` / `fill_region`.
 - **Rounded form** (coin, potion body, orb, wheel) → `ellipse`.
-- **Small detail** (eye, glint, seam, star) → pixel override or a tiny cluster.
+- **Small detail** (eye, glint, seam, star) → pixel override or a tiny cluster via `draw_cluster`.
 
 Rectangles are not forbidden — they are wrong only when the geometry is not rectangular. A creature built from rectangles is the classic failure; a chest built from polygons is equally wrong.
 
@@ -76,31 +76,56 @@ silhouette → major forms → internal structure → palette → shading → hi
 5. **Shading** — dark/mid/light per material; upper-left lighting.
 6. **Highlights** — sparse bright pixels on lit edges.
 7. **Details** — sparse pixel overrides for the last 5% (glints, crosses, stars, seams).
-8. **Cleanup** — verify: no unused palette keys, no unexpected mutations, 1–2px margins, every key painted, junctions connected.
+8. **Cleanup** — verify: no unused palette keys, no unexpected mutations, 1–2px margins, every key painted, junctions connected. Run `validate_scene(scene)` and the craft checks (`analyze_values`, `check_hue_shift`) as the final gate — the craft checks are HIGH defects (fix before ship) even when FACT checks pass.
 
 ## Bulk operations first
 
 Prefer region operations over individual `set_pixel` calls:
 
 - `fill_region(scene, x, y, w, h, color)` — fill a rectangular region
-- `draw_shape(scene, type, params)` — any shape: `fill`, `rect`, `rectout`, `ellipse`, `line`, `poly`, `polyout`
+- `mirror_region(scene, x, y, w, h, axis)` — mirror a region across its centerline (`'h'` left↔right, `'v'` top↔bottom); build one side of a creature, mirror the other
+- `draw_shape(scene, type, params)` — any shape: `fill`, `rect`, `rectout`, `ellipse`, `line`, `poly`, `polyout`, `curve` (params: `points`, `closed?`)
 - `move_frame_region(anim, frameId, x, y, w, h, dx, dy)` — move a region within a frame
 - `copy_frame_region(anim, srcId, dstId, x, y, w, h, dx, dy)` — copy a region between frames
 - `fill_frame_region(anim, frameId, x, y, w, h, color)` — fill a frame region
-- Palette edits — recolor by changing the palette key's hex
+- `replace_color(scene, from, to)` — recolor document-level by palette key or hex (rewrites layers + pixels; a new hex is added to the palette)
+- `flood_fill(scene, x, y, color, tolerance?)` — fill a bounded area from a seed point without knowing its polygon (writes overrides; fill with the background color to erase)
+- `draw_cluster(scene, x, y, pattern, color)` — paint a reusable pattern (scales, feathers, leaves, stars): `[[dx,dy],...]` offsets or a string grid like `["X.X", ".X."]`
+- `move_region(scene, x, y, w, h, dx, dy)` / `copy_region(scene, x, y, w, h, dx, dy)` — scene-level move/copy (same semantics as the frame versions)
+- `extract_outline(scene, region?)` — boundary pixels of a painted silhouette (`[{x, y}]`, row-major); pass a `{x, y, w, h}` region to isolate a character's outline against a filled background
+- `poly_union(a, b)` / `poly_subtract(a, b)` — combine polygon point arrays for shape editing (single-contour results; disjoint union concatenates both contours, holes aren't representable)
+- `diff_scenes(a, b)` — scene diff on resolved buffers: `{ changed, unchanged, pct, bbox, changes[] }` (different sizes → error; identical → 0 changed, null bbox)
+- `replace_color_region(scene, x, y, w, h, from, to)` — buffer-level recolor in a region (clamped; empty/from===to → no-op)
+- `check_symmetry(scene, axis, region?)` — symmetry check: `{ symmetric, diffCount, diffPixels[] }` (`'h'` left↔right, `'v'` top↔bottom; center skipped; empty → symmetric)
+- `dither_region(scene, x, y, w, h, opts)` — Bayer 4×4 ordered dithering between `{ from, to }` (gradient left→right, writes overrides)
+- `measure_distance(x1, y1, x2, y2)` — Euclidean distance for proportion checks
 
 Use `set_pixel`/`clear_pixel` only for sparse detail overrides (the scene's `pixels` map). If you are writing more than a handful of `set_pixel` calls for the same region, stop — use a shape or a region operation instead.
 
-## The render → inspect → fix loop
+Prefer `place_part`/`add_layer`/`diff_scenes` patches over `JSON.stringify(scene)` — a full scene rewrite is a 400k-token failure mode. Emit `get_patch(oldScene, newScene)` or call granular mutators; never re-emit the unchanged 18-layer scene.
+
+## The render → inspect → fix loop (patch-first, hard-stop)
 
 After each construction phase:
 
-1. `read_region(scene)` — auto-scaled ASCII preview of the whole canvas
-2. `inspect(scene)` — per-color counts + bounding boxes
-3. `read_region(scene, x, y, w, h)` — full-resolution zoom on problem areas
-4. Diagnose, fix surgically, re-render
+1. `diff_scenes(prevScene, scene)` — terse diff: `{ changed, bbox, changes }` only. Do NOT re-emit the full scene; emit a patch (`get_patch`) or call granular mutators (`add_layer`, `set_pixel`, `place_part`, `replace_color_region`).
+2. `inspect` only the bbox: `read_region(scene, bbox[0], bbox[1], bbox[2], bbox[3])` at scale 1, not the full canvas. Full-canvas `inspect` only on the first iteration.
+3. Taste check: `validate_scene` + `analyze_values` + `check_hue_shift` — if FAIL, fix palette before adding geometry.
+4. **Hard stop**: stop when `validate_scene` PASS and `check_hue_shift` PASS and (`compare_scene_to_reference` IoU>0.9 if reference exists), or after 5 iterations — whichever comes first. Do not iterate past 5.
+5. Context pruning: keep only `last_scene + diff`, not the full history. The MCP server's `diff_scenes` is the only inspection that stays in context beyond the last turn.
 
 Verify before concluding: silhouette bbox within 1–2px margins, every palette key painted, zero unexpected mutations, all part junctions connected.
+
+## Import / export + agent-loop tools
+
+- `decode_png(bytes)` → `{ width, height, rgba }` — import PNG art (8-bit RGB/RGBA/palette, all 5 filter types). Node zlib backend; browser decode is not implemented in v1.
+- `quantize_palette(rgba, maxColors?)` → `{ palette, indices }` — extract a palette from imported art (median-cut; default 16; `-1` index = fully transparent).
+- `validate_scene(scene)` → `{ valid, errors[] }` — scene-document integrity gate (size ladder, palette 5–12 keys, known layer types with in-bounds params, valid pixel keys/values).
+- `encode_apng(anim, opts?)` / `export_apng(anim, path, opts?)` — lossless animated export (opts: `fps`, `loop`).
+- `encode_gif(anim, opts?)` / `export_gif(anim, path, opts?)` — GIF89a export (≤256 unique colors; more → error).
+- `diff_scenes(a, b)` / `check_symmetry` / `measure_distance` / `dither_region` / `replace_color_region` — iteration comparison and provable critic FACT checks (see Bulk operations).
+- `compare_scene_to_reference(scene, refRgba, opts?)` — reference evaluation (silhouette IoU, palette & histogram distance; auto-scales ref).
+- `analyze_values(scene)` / `check_hue_shift(palette)` — craft checks: value steps & hue-shifted shading per family.
 
 ## API reference
 

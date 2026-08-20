@@ -36,7 +36,7 @@ Imagine each layer is a **sheet of glass with paint on it**, stacked on top of e
 
 ### The shapes the engine knows
 
-Seven kinds of instructions, like a box of stencils:
+Eight kinds of instructions, like a box of stencils:
 
 - **fill** — paint the whole canvas one color (the sky, the background)
 - **rect** — a solid rectangle (a chest, a building)
@@ -45,6 +45,7 @@ Seven kinds of instructions, like a box of stencils:
 - **line** — a straight line
 - **poly** — any many-sided shape (the workhorse for organic things: creatures, flames, tails)
 - **polyout** — just the outline of a many-sided shape (the dark contour around a creature)
+- **curve** — a smooth filled shape that flows through points (a leaf, a droplet, an organic blob)
 
 The engine figures out exactly which squares each shape covers — including the tricky math of filling a weird polygon — and paints them. The AI just picks the right stencil.
 
@@ -147,7 +148,7 @@ A scene document is plain JSON:
 }
 ```
 
-- **Layers** are named shapes painted in order (painter's algorithm): `fill`, `rect`, `rectout`, `ellipse`, `line`, `poly`, `polyout`.
+- **Layers** are named shapes painted in order (painter's algorithm): `fill`, `rect`, `rectout`, `ellipse`, `line`, `poly`, `polyout`, `curve`.
 - **Colors** are palette keys, never raw hex — the palette guarantees consistency and makes `inspect()` stats readable.
 - **`pixels`** is a sparse override map for sub-shape detail (window crosses, door knobs, stars). `null` clears.
 
@@ -203,7 +204,7 @@ node cli.js scenes/house.json --zoom 19,28,26,21
 node serve.js
 # then open http://localhost:8734
 
-# Run the accuracy suite (127 tests: primitives, edge cases, PNG, hashes, CLI, animation)
+# Run the accuracy suite (264 tests: primitives, edge cases, PNG, hashes, CLI, animation, agent-loop, taste, registries)
 node tests/test-suite.js
 ```
 
@@ -276,11 +277,31 @@ node cli.js anim <anim.json> [--diff a,b] [--validate a,b,x,y,w,h]
 | `draw_shape(scene, type, params)` | Generic shape layer |
 | `set_pixel(scene, x, y, color)` / `clear_pixel` | Sparse override |
 | `get_pixel(scene, x, y)` | Resolved color at a coordinate |
+| `mirror_region(scene, x, y, w, h, axis)` | Mirror a region across its centerline (h/v), writes overrides |
+| `replace_color(scene, from, to)` | Document-level recolor by palette key or hex |
+| `flood_fill(scene, x, y, color, tolerance?)` | Fill the 4-connected region of the seed's color, writes overrides |
+| `draw_cluster(scene, x, y, pattern, color)` | Paint a reusable pixel pattern (offsets or string grid), writes overrides |
+| `move_region(scene, x, y, w, h, dx, dy)` / `copy_region(scene, x, y, w, h, dx, dy)` | Move/copy a region's opaque pixels, writes overrides |
+| `extract_outline(scene, region?)` | Boundary pixels `[{x, y}]` of the painted silhouette (4-neighbor transparent/out-of-canvas/out-of-region) |
+| `poly_union(a, b)` / `poly_subtract(a, b)` | Combine polygon point arrays (single contour; disjoint union concatenates both, holes not representable) |
 | `read_region(scene, x, y, w, h, opts)` | ASCII map or color counts (multi-resolution) |
 | `inspect(scene)` | Per-color counts + bounding boxes |
 | `render(scene)` | RGBA pixel buffer |
 | `encode_png(scene)` / `export_png(scene, path)` | PNG bytes / file |
 | `encode_png_buffer(rgba, w, h)` | PNG bytes for an arbitrary RGBA buffer (spritesheets) |
+| `encode_apng_buffer(frames, w, h, opts)` | APNG bytes from frame buffers (opts: `fps`, `loop`) |
+| `decode_png(bytes)` | PNG import: `{ width, height, rgba }` (Node zlib backend; 8-bit RGB/RGBA/palette) |
+| `quantize_palette(rgba, maxColors?)` | Median-cut palette extraction: `{ palette, indices }` (default 16, `-1` = transparent) |
+| `validate_scene(scene)` | Scene integrity: `{ valid, errors[] }` (size ladder, palette 5–12, layer/pixel bounds) |
+| `diff_scenes(a, b)` | Scene diff: `{ changed, unchanged, pct, bbox, changes[] }` (+ `changed_pixels` etc. aliases) |
+| `replace_color_region(scene, x, y, w, h, from, to)` | Buffer-level recolor in a region (clamped; empty/from===to → no-op) |
+| `measure_distance(x1, y1, x2, y2)` | Euclidean distance |
+| `check_symmetry(scene, axis, region?)` | Symmetry check: `{ symmetric, diffCount, diffPixels[] }` |
+| `dither_region(scene, x, y, w, h, opts)` | Bayer 4×4 ordered dithering `{ from, to }` (gradient left→right) |
+| `compare_scene_to_reference(scene, refRgba, opts?)` | Reference comparison: silhouette IoU, palette & histogram distance (auto-scales ref) |
+| `analyze_values(scene)` / `check_hue_shift(palette)` | Craft checks: value steps & hue-shifted shading per family |
+| `encode_compact(scene)` / `decode_compact(compact)` | Compact encoding `{ s, p, l, x }` (short keys, palette indices, flat points, 40% saving) |
+| `get_patch(oldScene, newScene)` / `apply_patch(scene, patch)` | Patch-first loop: terse diff (<30% of full scene), hard-stop at 5 iterations |
 | `scene_to_html(scene, opts)` | Interactive preview HTML |
 
 `engine/animation.js` (load after pixel-engine; attaches to the same object):
@@ -297,6 +318,8 @@ node cli.js anim <anim.json> [--diff a,b] [--validate a,b,x,y,w,h]
 | `validate_change(anim, a, b, region)` | PASS/FAIL against an allowed region + unexpected list |
 | `frame_palette` / `palette_drift` | Resolved color usage / palette consistency |
 | `encode_spritesheet(anim, opts)` / `export_spritesheet` | PNG sheet (export only) |
+| `encode_apng(anim, opts)` / `export_apng(anim, path, opts)` | APNG animated export (lossless; opts: `fps`, `loop`) |
+| `encode_gif(anim, opts)` / `export_gif(anim, path, opts)` | GIF89a animated export (≤256 unique colors; more → error) |
 | `animation_to_html(anim, opts)` | Self-contained playback preview |
 
 ## Project structure
@@ -304,7 +327,7 @@ node cli.js anim <anim.json> [--diff a,b] [--validate a,b,x,y,w,h]
 ```text
 engine/pixel-engine.js   engine + tools (~700 lines, zero deps)
 engine/animation.js      animation subsystem: frames, exact diffing, validation, spritesheets
-tests/test-suite.js      127-test accuracy suite (node tests/test-suite.js)
+tests/test-suite.js      264-test accuracy suite (node tests/test-suite.js)
 cli.js                   render/inspect/zoom/export driver + anim subcommand
 serve.js                 zero-dependency static server for the sandbox
 prototype.html           browser sandbox
@@ -317,7 +340,7 @@ out/                     generated PNGs, previews, screenshots (incl. out/benchm
 
 ## Status and next steps
 
-The 64×64 baseline is validated and **hash-locked by a 127-test accuracy
+The 64×64 baseline is validated and **hash-locked by a 264-test accuracy
 suite** — any engine change that moves a single pixel fails the run. The
 representation scales: 128×128 and 256×256 scenes were authored and verified
 pixel-exact (including a 2× upscale of the house), the animation subsystem
@@ -336,7 +359,7 @@ Documented next experiments (in `docs/FINDINGS.md` and `docs/plans/tasks.md`):
 
 ## Known limitations
 
-- Experimental prototype: no CI, no automated release pipeline (the npm package is published manually)
+- Experimental prototype: the npm package is published via `scripts/release.js` (CI runs the suite on Node 18/20/22)
 - PNG encoder uses a hand-rolled fixed-Huffman DEFLATE (RFC 1951) — byte-valid
   (round-trip verified against zlib), but not the most compact compression
 - ASCII inspection is the agent's primary "eyes" — pixel probes and `inspect()` stats are more reliable than eyeballing ASCII rows (see FINDINGS §5)
